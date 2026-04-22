@@ -1,121 +1,87 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import Pillars from './pages/Pillars'
 
-function App() {
-  const [count, setCount] = useState(0)
-
+function Sidebar() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div style={{
+      width: '220px',
+      minHeight: '100vh',
+      background: 'var(--navy)',
+      display: 'flex',
+      flexDirection: 'column',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      zIndex: 10
+    }}>
+      <div style={{ padding: '28px 24px 20px', borderBottom: '1px solid #1E293B' }}>
+        <div className="font-display" style={{
+          fontSize: '15px',
+          color: '#F8FAFC',
+          lineHeight: '1.3',
+          letterSpacing: '-0.01em'
+        }}>
+          Outcome<br/>Roadmap
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+        <div style={{ fontSize: '10px', color: 'var(--slate-light)', marginTop: '4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          Head of Product
         </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      </div>
 
-      <div className="ticks"></div>
+      <nav style={{ padding: '16px 12px', flex: 1 }}>
+        {[
+          { to: '/', label: 'Pillars & Goals', icon: '◈' },
+          { to: '/roadmap', label: 'Unified Roadmap', icon: '⊞', soon: true },
+          { to: '/replan', label: 'Replan', icon: '⟳', soon: true },
+          { to: '/smt', label: 'SMT View', icon: '↗', soon: true },
+        ].map(({ to, label, icon, soon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '9px 12px',
+              borderRadius: '6px',
+              marginBottom: '2px',
+              textDecoration: 'none',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: isActive ? '#F8FAFC' : 'var(--slate-light)',
+              background: isActive ? 'var(--navy-mid)' : 'transparent',
+              opacity: soon ? 0.4 : 1,
+              pointerEvents: soon ? 'none' : 'auto',
+            })}
+          >
+            <span style={{ fontSize: '14px' }}>{icon}</span>
+            <span>{label}</span>
+            {soon && <span style={{ fontSize: '9px', marginLeft: 'auto', letterSpacing: '0.06em', color: 'var(--slate-light)' }}>SOON</span>}
+          </NavLink>
+        ))}
+      </nav>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      <div style={{ padding: '16px 24px', borderTop: '1px solid #1E293B' }}>
+        <div style={{ fontSize: '10px', color: 'var(--slate-light)', letterSpacing: '0.06em' }}>
+          PHASE 1 · STEP 2.1
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </div>
+    </div>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <BrowserRouter>
+      <div style={{ display: 'flex' }}>
+        <Sidebar />
+        <main style={{ marginLeft: '220px', flex: 1, minHeight: '100vh', padding: '40px 48px' }}>
+          <Routes>
+            <Route path="/" element={<Pillars />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  )
+}
