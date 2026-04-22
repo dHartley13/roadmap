@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import Pillars from './pages/Pillars'
+import Roadmap from './pages/Roadmap'
 
 function Sidebar() {
   return (
@@ -31,7 +32,7 @@ function Sidebar() {
       <nav style={{ padding: '16px 12px', flex: 1 }}>
         {[
           { to: '/', label: 'Pillars & Goals', icon: '◈' },
-          { to: '/roadmap', label: 'Unified Roadmap', icon: '⊞', soon: true },
+          { to: '/roadmap', label: 'Unified Roadmap', icon: '⊞' },
           { to: '/replan', label: 'Replan', icon: '⟳', soon: true },
           { to: '/smt', label: 'SMT View', icon: '↗', soon: true },
         ].map(({ to, label, icon, soon }) => (
@@ -79,6 +80,7 @@ export default function App() {
         <main style={{ marginLeft: '220px', flex: 1, minHeight: '100vh', padding: '40px 48px' }}>
           <Routes>
             <Route path="/" element={<Pillars />} />
+            <Route path="/roadmap" element={<Roadmap />} />
           </Routes>
         </main>
       </div>
