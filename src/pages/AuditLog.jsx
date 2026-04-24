@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 const EVENT_META = {
-  item_moved: { label: "Feature moved", color: "#1E40AF", bg: "#DBEAFE" },
-  item_updated: { label: "Feature updated", color: "#0F766E", bg: "#CCFBF1" },
-  item_created: { label: "Feature added", color: "#166534", bg: "#DCFCE7" },
-  outcome_added: { label: "Outcome added", color: "#7C3AED", bg: "#EDE9FE" },
-  outcome_edited: { label: "Outcome edited", color: "#7C3AED", bg: "#EDE9FE" },
-  kpi_updated: { label: "KPI updated", color: "#B45309", bg: "#FEF3C7" },
-  item_resized: { label: "Feature resized", color: "#0369A1", bg: "#E0F2FE" },
+  item_moved:     { label: 'Feature moved',    color: '#1E40AF', bg: '#DBEAFE' },
+  item_resized:   { label: 'Feature resized',  color: '#0369A1', bg: '#E0F2FE' },
+  item_updated:   { label: 'Feature updated',  color: '#0F766E', bg: '#CCFBF1' },
+  item_created:   { label: 'Feature added',    color: '#166534', bg: '#DCFCE7' },
+  item_deleted:   { label: 'Feature deleted',  color: '#991B1B', bg: '#FEE2E2' },
+  outcome_added:  { label: 'Outcome added',    color: '#7C3AED', bg: '#EDE9FE' },
+  outcome_deleted:{ label: 'Outcome deleted',  color: '#BE185D', bg: '#FCE7F3' },
+  kpi_updated:    { label: 'KPI updated',      color: '#B45309', bg: '#FEF3C7' },
+  kpi_deleted:    { label: 'KPI deleted',      color: '#991B1B', bg: '#FEE2E2' },
+  kpi_created:    { label: 'KPI created',      color: '#166534', bg: '#DCFCE7' },
 };
 
 const MONTHS = [
