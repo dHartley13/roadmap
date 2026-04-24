@@ -80,6 +80,7 @@ const STATUSES = [
   { value: "blocked", label: "Blocked", color: "#991B1B", bg: "#FEE2E2" },
 ];
 
+// Helper functions ──────────────────────────────────────────────────────────────────
 function typeMeta(v) {
   return ITEM_TYPES.find((t) => t.value === v) || ITEM_TYPES[0];
 }
@@ -104,6 +105,39 @@ function confidenceMeta(l) {
       low: { color: "#991B1B", bg: "#FEE2E2", label: "Low" },
     }[l] || { color: "#991B1B", bg: "#FEE2E2", label: "Low" }
   );
+}
+
+function assignLanes(rowItems) {
+  const sorted = [...rowItems].sort(
+    (a, b) => (a.start_week ?? 0) - (b.start_week ?? 0),
+  );
+  const lanes = []; // each lane is array of items
+
+  sorted.forEach((item) => {
+    const sw = item.start_week ?? 0;
+    const ew = item.end_week ?? sw + 4;
+    // Find first lane where this item doesn't overlap
+    let placed = false;
+    for (let i = 0; i < lanes.length; i++) {
+      const lastItem = lanes[i][lanes[i].length - 1];
+      const lastEW = lastItem.end_week ?? (lastItem.start_week ?? 0) + 4;
+      if (sw >= lastEW) {
+        lanes[i].push(item);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) lanes.push([item]);
+  });
+
+  // Return map of item id → lane index
+  const laneMap = {};
+  lanes.forEach((lane, li) => {
+    lane.forEach((item) => {
+      laneMap[item.id] = li;
+    });
+  });
+  return { laneMap, laneCount: lanes.length };
 }
 
 function quarterStartWeek(q) {
@@ -132,7 +166,7 @@ function defaultWeeks(quarter) {
 }
 
 // ── Timeline Item ───────────────────────────────────────────────────────────
-function TimelineItem({ item, rowY, onUpdate, onClick }) {
+function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
   const dragRef = useRef(null);
   const tm = typeMeta(item.type);
   const cm = confidenceMeta(confidenceLevel(item));
@@ -141,6 +175,9 @@ function TimelineItem({ item, rowY, onUpdate, onClick }) {
   const ew = item.end_week ?? sw + WEEKS_PER_MONTH;
   const x = weekToX(sw);
   const w = Math.max(WEEK_W, weekToX(ew) - x);
+
+  const ITEM_H = TEAM_H - 10;
+  const laneOffsetY = lane * (ITEM_H + 4); // stack with 4px gap
 
   function startDrag(e, mode) {
     e.stopPropagation();
@@ -216,7 +253,7 @@ function TimelineItem({ item, rowY, onUpdate, onClick }) {
     <g>
       <rect
         x={x + 2}
-        y={rowY + 5}
+        y={rowY + laneOffsetY + 5}
         width={w - 4}
         height={itemH}
         rx={4}
@@ -229,14 +266,14 @@ function TimelineItem({ item, rowY, onUpdate, onClick }) {
       />
       <circle
         cx={x + w - 10}
-        cy={rowY + 12}
+        cy={rowY + laneOffsetY + 12}
         r={3.5}
         fill={cm.color}
         style={{ pointerEvents: "none" }}
       />
       <foreignObject
         x={x + 7}
-        y={rowY + 6}
+        y={rowY + laneOffsetY + 6}
         width={Math.max(0, w - 20)}
         height={itemH - 4}
         style={{ pointerEvents: "none" }}
@@ -262,7 +299,7 @@ function TimelineItem({ item, rowY, onUpdate, onClick }) {
       {/* Left resize handle */}
       <rect
         x={x + 2}
-        y={rowY + 5}
+        y={rowY + laneOffsetY + 5}
         width={8}
         height={itemH}
         rx={2}
@@ -273,7 +310,7 @@ function TimelineItem({ item, rowY, onUpdate, onClick }) {
       {/* Right resize handle */}
       <rect
         x={x + w - 10}
-        y={rowY + 5}
+        y={rowY + laneOffsetY + 5}
         width={8}
         height={itemH}
         rx={2}
@@ -291,6 +328,8 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [editingSummary, setEditingSummary] = useState(false);
+  const [summaryText, setSummaryText] = useState(outcome.summary);
 
   async function loadLinks() {
     const { data } = await supabase
@@ -299,6 +338,16 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
       .eq("outcome_id", outcome.id);
     setLinks(data || []);
     setLoading(false);
+  }
+
+  async function saveSummary() {
+    if (!summaryText.trim()) return;
+    await supabase
+      .from("quarterly_outcomes")
+      .update({ summary: summaryText.trim() })
+      .eq("id", outcome.id);
+    setEditingSummary(false);
+    onSaved();
   }
 
   useEffect(() => {
@@ -406,17 +455,101 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
                 marginBottom: "4px",
               }}
             >
-              Feature contributions
+              Outcomes
             </h2>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--slate)",
-                lineHeight: "1.5",
-              }}
-            >
-              {outcome.summary}
-            </p>
+            {editingSummary ? (
+              <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                <input
+                  autoFocus
+                  value={summaryText}
+                  onChange={(e) => setSummaryText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveSummary();
+                    if (e.key === "Escape") setEditingSummary(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    fontSize: "12px",
+                    padding: "5px 8px",
+                    border: "1px solid var(--blue)",
+                    borderRadius: "4px",
+                    fontFamily: "DM Sans, sans-serif",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  onClick={saveSummary}
+                  style={{
+                    fontSize: "11px",
+                    padding: "4px 10px",
+                    borderRadius: "4px",
+                    border: "none",
+                    background: "var(--blue)",
+                    color: "#fff",
+                    cursor: "pointer",
+                    fontFamily: "DM Sans, sans-serif",
+                  }}
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingSummary(false)}
+                  style={{
+                    fontSize: "11px",
+                    padding: "4px 8px",
+                    borderRadius: "4px",
+                    border: "1px solid var(--border)",
+                    background: "#fff",
+                    color: "var(--slate)",
+                    cursor: "pointer",
+                    fontFamily: "DM Sans, sans-serif",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "8px",
+                  marginTop: "4px",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--slate)",
+                    lineHeight: "1.5",
+                    flex: 1,
+                    margin: 0,
+                  }}
+                >
+                  {outcome.summary}
+                </p>
+                <button
+                  onClick={() => {
+                    setSummaryText(outcome.summary);
+                    setEditingSummary(true);
+                  }}
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--slate-light)",
+                    background: "transparent",
+                    border: "1px solid var(--border)",
+                    borderRadius: "4px",
+                    padding: "2px 8px",
+                    cursor: "pointer",
+                    fontFamily: "DM Sans, sans-serif",
+                    flexShrink: 0,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -625,7 +758,7 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
                   >
                     {search
                       ? "No matching features"
-                      : "All features in this KPI focus are already linked"}
+                      : "All features in this product focus are already linked"}
                   </p>
                 ) : (
                   <div
@@ -758,6 +891,251 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
   );
 }
 
+// Outcome modal ────────────────────────────────────────────────────────────
+function AddOutcomeModal({
+  pillarId,
+  goalId,
+  goal,
+  year,
+  filterTeam,
+  teams,
+  onClose,
+  onSaved,
+}) {
+  const [text, setText] = useState("");
+  const [teamId, setTeamId] = useState(filterTeam || "");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!text.trim()) return;
+    setSaving(true);
+    await supabase.from("quarterly_outcomes").insert({
+      pillar_id: pillarId,
+      goal_id: goalId,
+      team_id: teamId || null,
+      quarter: goal.quarter,
+      financial_year: year,
+      summary: text.trim(),
+    });
+    setSaving(false);
+    onSaved();
+  }
+
+  const inp = {
+    width: "100%",
+    padding: "8px 10px",
+    border: "1px solid var(--border)",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontFamily: "DM Sans, sans-serif",
+    color: "var(--navy)",
+    background: "#fff",
+    outline: "none",
+  };
+  const lbl = {
+    fontSize: "10px",
+    fontWeight: "600",
+    color: "var(--slate)",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    marginBottom: "4px",
+    display: "block",
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 200,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "12px",
+          width: "520px",
+          padding: "28px",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
+        }}
+      >
+        {/* Header */}
+        <div style={{ marginBottom: "20px" }}>
+          <div
+            style={{
+              fontSize: "10px",
+              fontWeight: "600",
+              color: "var(--slate-light)",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              marginBottom: "4px",
+            }}
+          >
+            Add outcome · {goal.quarter} · {year}
+          </div>
+          <h2
+            className="font-display"
+            style={{
+              fontSize: "18px",
+              color: "var(--navy)",
+              marginBottom: "12px",
+            }}
+          >
+            What did your team achieve?
+          </h2>
+
+          {/* Product focus reminder */}
+          {(goal.kpi_name ||
+            goal.driver_statement ||
+            goal.lead_metric_name) && (
+            <div
+              style={{
+                background: "#F0FDF4",
+                border: "1px solid #BBF7D0",
+                borderRadius: "8px",
+                padding: "12px 14px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "9px",
+                  fontWeight: "700",
+                  color: "#166534",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  marginBottom: "6px",
+                }}
+              >
+                Product focus context
+              </div>
+              {goal.kpi_name && (
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--navy)",
+                    marginBottom: "3px",
+                  }}
+                >
+                  <span style={{ color: "var(--slate-light)" }}>KPI: </span>
+                  {goal.kpi_name}
+                  {goal.kpi_target && (
+                    <span style={{ color: "var(--slate-light)" }}>
+                      {" "}
+                      → {goal.kpi_target}
+                    </span>
+                  )}
+                </div>
+              )}
+              {goal.driver_statement && (
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--navy)",
+                    marginBottom: "3px",
+                  }}
+                >
+                  <span style={{ color: "var(--slate-light)" }}>Focus: </span>
+                  {goal.driver_statement}
+                </div>
+              )}
+              {goal.lead_metric_name && (
+                <div style={{ fontSize: "11px", color: "var(--navy)" }}>
+                  <span style={{ color: "var(--slate-light)" }}>
+                    Measuring:{" "}
+                  </span>
+                  {goal.lead_metric_name}
+                  {goal.lead_metric_baseline && goal.lead_metric_target && (
+                    <span style={{ color: "var(--slate-light)" }}>
+                      {" "}
+                      ({goal.lead_metric_baseline} → {goal.lead_metric_target})
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div>
+            <label style={lbl}>Outcome summary</label>
+            <textarea
+              autoFocus
+              style={{ ...inp, minHeight: "80px", resize: "vertical" }}
+              placeholder="How are you expecting to contribute to the metrics and product focus above"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label style={lbl}>Team</label>
+            <select
+              style={{ ...inp, cursor: "pointer" }}
+              value={teamId}
+              onChange={(e) => setTeamId(e.target.value)}
+            >
+              <option value="">— Unassigned —</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              justifyContent: "flex-end",
+              paddingTop: "4px",
+            }}
+          >
+            <button
+              onClick={onClose}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "6px",
+                border: "1px solid var(--border)",
+                background: "#fff",
+                fontSize: "12px",
+                color: "var(--slate)",
+                cursor: "pointer",
+                fontFamily: "DM Sans, sans-serif",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "6px",
+                border: "none",
+                background: "var(--blue)",
+                fontSize: "12px",
+                fontWeight: "600",
+                color: "#fff",
+                cursor: saving ? "not-allowed" : "pointer",
+                opacity: saving ? 0.7 : 1,
+                fontFamily: "DM Sans, sans-serif",
+              }}
+            >
+              {saving ? "Saving…" : "Add outcome"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Outcome Cell ────────────────────────────────────────────────────────────
 function OutcomeCell({
   outcomes,
@@ -769,12 +1147,11 @@ function OutcomeCell({
   teams,
   items,
   onReload,
-  onOpenMapping
+  onOpenMapping,
+  onAddOutcome ,
 }) {
-  const [adding, setAdding] = useState(false);
-  const [text, setText] = useState("");
-  const [teamId, setTeamId] = useState(filterTeam || "");
-  const [saving, setSaving] = useState(false);
+  const [editingOutcome, setEditingOutcome] = useState(null);
+  const [editingText, setEditingText] = useState("");
 
   const qOutcomes = outcomes.filter(
     (o) =>
@@ -799,6 +1176,16 @@ function OutcomeCell({
     setSaving(false);
     setText("");
     setAdding(false);
+    onReload();
+  }
+
+  async function saveEdit(id) {
+    if (!editingText.trim()) return;
+    await supabase
+      .from("quarterly_outcomes")
+      .update({ summary: editingText.trim() })
+      .eq("id", id);
+    setEditingOutcome(null);
     onReload();
   }
 
@@ -830,19 +1217,60 @@ function OutcomeCell({
             gap: "6px",
           }}
         >
-          <span
-            onClick={() => onOpenMapping(o)}
-            style={{
-              fontSize: "10px",
-              color: "var(--navy)",
-              lineHeight: "1.4",
-              flex: 1,
-              cursor: "pointer",
+          {editingOutcome?.id === o.id ? (
+            <input
+              autoFocus
+              value={editingText}
+              onChange={(e) => setEditingText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveEdit(o.id);
+                if (e.key === "Escape") setEditingOutcome(null);
+              }}
+              onBlur={() => saveEdit(o.id)}
+              style={{
+                flex: 1,
+                fontSize: "10px",
+                padding: "2px 4px",
+                border: "1px solid var(--blue)",
+                borderRadius: "3px",
+                fontFamily: "DM Sans, sans-serif",
+                outline: "none",
+              }}
+            />
+          ) : (
+            <span
+              onClick={() => onOpenMapping(o)}
+              style={{
+                fontSize: "10px",
+                color: "var(--navy)",
+                lineHeight: "1.4",
+                flex: 1,
+                cursor: "pointer",
+              }}
+              title="Click to map contributing features"
+            >
+              {o.summary}
+            </span>
+          )}
+          <button
+            onClick={() => {
+              setEditingOutcome(o);
+              setEditingText(o.summary);
             }}
-            title="Click to map contributing features"
+            style={{
+              border: "none",
+              background: "transparent",
+              color: "var(--slate-light)",
+              cursor: "pointer",
+              fontSize: "10px",
+              flexShrink: 0,
+              padding: 0,
+              lineHeight: 1,
+            }}
+            title="Edit outcome"
           >
-            {o.summary}
-          </span>
+            ✎
+          </button>
           <button
             onClick={() => deleteOutcome(o.id)}
             style={{
@@ -861,89 +1289,8 @@ function OutcomeCell({
         </div>
       ))}
 
-      {adding ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <input
-            autoFocus
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") save();
-              if (e.key === "Escape") setAdding(false);
-            }}
-            placeholder="Outcome summary..."
-            style={{
-              fontSize: "10px",
-              padding: "4px 6px",
-              border: "1px solid var(--blue)",
-              borderRadius: "4px",
-              fontFamily: "DM Sans, sans-serif",
-              outline: "none",
-            }}
-          />
-          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-            <span style={{ fontSize: "9px", color: "var(--slate-light)" }}>
-              Team:
-            </span>
-            <select
-              value={teamId}
-              onChange={(e) => setTeamId(e.target.value)}
-              style={{
-                fontSize: "10px",
-                padding: "2px 4px",
-                border: "1px solid var(--border)",
-                borderRadius: "4px",
-                fontFamily: "DM Sans, sans-serif",
-                flex: 1,
-                outline: "none",
-              }}
-            >
-              <option value="">— unassigned —</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={save}
-              disabled={saving}
-              style={{
-                fontSize: "10px",
-                padding: "4px 8px",
-                borderRadius: "4px",
-                border: "none",
-                background: "var(--blue)",
-                color: "#fff",
-                cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
-              }}
-            >
-              {saving ? "…" : "Add"}
-            </button>
-            <button
-              onClick={() => setAdding(false)}
-              style={{
-                fontSize: "10px",
-                padding: "4px 6px",
-                borderRadius: "4px",
-                border: "1px solid var(--border)",
-                background: "#fff",
-                color: "var(--slate)",
-                cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
-              }}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      ) : (
         <button
-          onClick={() => {
-            setTeamId(filterTeam || "");
-            setAdding(true);
-          }}
+          onClick={() => onAddOutcome()}
           style={{
             fontSize: "9px",
             color: "var(--slate-light)",
@@ -958,36 +1305,45 @@ function OutcomeCell({
         >
           + outcome
         </button>
-      )}
-
     </div>
   );
 }
 
 // ── Item Detail Panel ───────────────────────────────────────────────────────
-function ItemDetailPanel({ item, pillars, goals, teams, onClose, onSaved, onDeleted }) {
-  const [form, setForm]         = useState({ ...item })
-  const [saving, setSaving]     = useState(false)
-  const [confirmDelete, setCD]  = useState(false)
-  const [itemLinks, setItemLinks]       = useState([])
-  const [loadingLinks, setLoadingLinks] = useState(true)
-  const filteredGoals = goals.filter(g => g.pillar_id === form.pillar_id)
+function ItemDetailPanel({
+  item,
+  pillars,
+  goals,
+  teams,
+  onClose,
+  onSaved,
+  onDeleted,
+}) {
+  const [mode, setMode] = useState("read"); // 'read' | 'edit'
+  const [form, setForm] = useState({ ...item });
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setCD] = useState(false);
+  const [itemLinks, setItemLinks] = useState([]);
+  const [loadingLinks, setLoading] = useState(true);
+  const filteredGoals = goals.filter((g) => g.pillar_id === form.pillar_id);
 
   async function loadItemLinks() {
     const { data } = await supabase
-      .from('outcome_items')
-      .select('*, quarterly_outcomes(*)')
-      .eq('roadmap_item_id', item.id)
-    setItemLinks(data || [])
-    setLoadingLinks(false)
+      .from("outcome_items")
+      .select("*, quarterly_outcomes(*)")
+      .eq("roadmap_item_id", item.id);
+    setItemLinks(data || []);
+    setLoading(false);
   }
 
   async function removeItemLink(linkId) {
-    await supabase.from('outcome_items').delete().eq('id', linkId)
-    loadItemLinks()
+    await supabase.from("outcome_items").delete().eq("id", linkId);
+    loadItemLinks();
   }
 
-  useEffect(() => { loadItemLinks() }, [item.id])
+  useEffect(() => {
+    loadItemLinks();
+  }, [item.id]);
 
   async function save() {
     setSaving(true);
@@ -996,21 +1352,21 @@ function ItemDetailPanel({ item, pillars, goals, teams, onClose, onSaved, onDele
       .update({
         title: form.title,
         type: form.type,
-        track: form.track,
         status: form.status,
         quarter: form.quarter,
         financial_year: form.financial_year,
-        owner: form.owner || null,
+        team_id: form.team_id || null,
         pillar_id: form.pillar_id || null,
         goal_id: form.goal_id || null,
-        team_id: form.team_id || null,
-        value_statement: form.value_statement || null,
+        hypothesis: form.hypothesis || null,
         lead_metric_name: form.lead_metric_name || null,
         jira_ref: form.jira_ref || null,
         doc_url: form.doc_url || null,
+        description: form.description || null,
       })
       .eq("id", item.id);
     setSaving(false);
+    setMode("read");
     onSaved();
   }
 
@@ -1018,6 +1374,10 @@ function ItemDetailPanel({ item, pillars, goals, teams, onClose, onSaved, onDele
     await supabase.from("roadmap_items").delete().eq("id", item.id);
     onDeleted();
   }
+
+  const tm = typeMeta(form.type);
+  const sm = statusMeta(form.status);
+  const team = teams.find((t) => t.id === form.team_id);
 
   const inp = {
     width: "100%",
@@ -1039,13 +1399,6 @@ function ItemDetailPanel({ item, pillars, goals, teams, onClose, onSaved, onDele
     marginBottom: "4px",
     display: "block",
   };
-  const cm = confidenceMeta(confidenceLevel(form));
-  const missing = [
-    !form.pillar_id && "Pillar",
-    !form.goal_id && "KPI focus",
-    !form.value_statement && "Value statement",
-    !form.lead_metric_name && "Lead metric",
-  ].filter(Boolean);
 
   return (
     <div
@@ -1063,7 +1416,7 @@ function ItemDetailPanel({ item, pillars, goals, teams, onClose, onSaved, onDele
     >
       <div
         style={{
-          width: "460px",
+          width: "440px",
           height: "100vh",
           background: "#fff",
           overflow: "auto",
@@ -1072,40 +1425,103 @@ function ItemDetailPanel({ item, pillars, goals, teams, onClose, onSaved, onDele
           boxShadow: "-8px 0 32px rgba(0,0,0,0.15)",
         }}
       >
+        {/* Header */}
         <div
           style={{
             padding: "18px 22px",
             borderBottom: "1px solid var(--border)",
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: "flex-start",
             position: "sticky",
             top: 0,
             background: "#fff",
             zIndex: 1,
           }}
         >
-          <div>
+          <div style={{ flex: 1, paddingRight: "12px" }}>
+            {mode === "edit" ? (
+              <input
+                style={{ ...inp, fontSize: "14px", fontWeight: "700" }}
+                value={form.title}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, title: e.target.value }))
+                }
+              />
+            ) : (
+              <div
+                style={{
+                  fontSize: "14px",
+                  fontWeight: "700",
+                  color: "var(--navy)",
+                  lineHeight: "1.4",
+                }}
+              >
+                {form.title}
+              </div>
+            )}
             <div
               style={{
-                fontSize: "10px",
-                color: "var(--slate-light)",
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                marginBottom: "2px",
+                display: "flex",
+                gap: "6px",
+                marginTop: "8px",
+                flexWrap: "wrap",
+                alignItems: "center",
               }}
             >
-              Item detail
-            </div>
-            <div
-              style={{
-                fontSize: "14px",
-                fontWeight: "700",
-                color: "var(--navy)",
-                lineHeight: "1.3",
-              }}
-            >
-              {form.title}
+              <span
+                style={{
+                  fontSize: "9px",
+                  fontWeight: "700",
+                  padding: "2px 7px",
+                  borderRadius: "3px",
+                  background: tm.bg,
+                  color: tm.color,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {tm.label}
+              </span>
+              <span
+                style={{
+                  fontSize: "9px",
+                  fontWeight: "600",
+                  padding: "2px 7px",
+                  borderRadius: "3px",
+                  background: sm.bg,
+                  color: sm.color,
+                }}
+              >
+                {sm.label}
+              </span>
+              {team && (
+                <span
+                  style={{
+                    fontSize: "10px",
+                    color: "var(--slate)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      background: team.colour,
+                      display: "inline-block",
+                    }}
+                  />
+                  {team.name}
+                </span>
+              )}
+              {form.quarter && (
+                <span style={{ fontSize: "10px", color: "var(--slate-light)" }}>
+                  {form.quarter}
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -1122,190 +1538,297 @@ function ItemDetailPanel({ item, pillars, goals, teams, onClose, onSaved, onDele
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              flexShrink: 0,
             }}
           >
             ✕
           </button>
         </div>
 
-        <div
-          style={{
-            padding: "10px 22px",
-            background: cm.bg,
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span
-              style={{ fontSize: "11px", fontWeight: "700", color: cm.color }}
-            >
-              {cm.label} confidence
-            </span>
-            <span style={{ fontSize: "10px", color: cm.color }}>
-              {4 - missing.length}/4 fields
-            </span>
-          </div>
-          {missing.length > 0 && (
-            <div
-              style={{ fontSize: "10px", color: cm.color, marginTop: "3px" }}
-            >
-              Missing: {missing.join(" · ")}
-            </div>
-          )}
-        </div>
-
+        {/* Body */}
         <div
           style={{
             padding: "18px 22px",
+            flex: 1,
             display: "flex",
             flexDirection: "column",
-            gap: "12px",
-            flex: 1,
+            gap: "16px",
           }}
         >
-          <div>
-            <label style={lbl}>Title</label>
-            <input
-              style={inp}
-              value={form.title}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, title: e.target.value }))
-              }
-            />
-          </div>
+          {mode === "read" ? (
+            <>
+              {/* Description */}
+              {form.description && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: "700",
+                      color: "var(--blue)",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Description
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--navy)",
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    {form.description}
+                  </div>
+                </div>
+              )}
+              {/* Hypothesis */}
+              {form.hypothesis ? (
+                <div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: "700",
+                      color: "var(--blue)",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Hypothesis
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--navy)",
+                      lineHeight: "1.6",
+                      background: "var(--bg)",
+                      padding: "10px 14px",
+                      borderRadius: "6px",
+                      borderLeft: "3px solid var(--blue)",
+                    }}
+                  >
+                    {form.hypothesis}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    border: "1px dashed var(--border)",
+                    borderRadius: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--slate-light)",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    No hypothesis set —{" "}
+                  </span>
+                  <button
+                    onClick={() => setMode("edit")}
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--blue)",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontFamily: "DM Sans, sans-serif",
+                      padding: 0,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    add one
+                  </button>
+                </div>
+              )}
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "10px",
-            }}
-          >
-            <div>
-              <label style={lbl}>Type</label>
-              <select
-                style={{ ...inp, cursor: "pointer" }}
-                value={form.type}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, type: e.target.value }))
-                }
-              >
-                {ITEM_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={lbl}>Status</label>
-              <select
-                style={{ ...inp, cursor: "pointer" }}
-                value={form.status}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, status: e.target.value }))
-                }
-              >
-                {STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+              {/* Outcome links */}
+              <div>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: "700",
+                    color: "var(--blue)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Outcomes contributing to
+                </div>
+                {loadingLinks ? (
+                  <p style={{ fontSize: "12px", color: "var(--slate-light)" }}>
+                    Loading...
+                  </p>
+                ) : itemLinks.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "10px 14px",
+                      border: "1px dashed var(--border)",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--slate-light)",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      Not linked to any outcomes yet — click an outcome on the
+                      roadmap to link this feature.
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "6px",
+                    }}
+                  >
+                    {itemLinks.map((link) => (
+                      <div
+                        key={link.id}
+                        style={{
+                          padding: "10px 14px",
+                          background: "#F0FDF4",
+                          border: "1px solid #BBF7D0",
+                          borderRadius: "6px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: "700",
+                            color: "#166534",
+                            marginBottom: "2px",
+                          }}
+                        >
+                          {link.quarterly_outcomes?.quarter} ·{" "}
+                          {link.quarterly_outcomes?.financial_year}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--navy)",
+                            lineHeight: "1.4",
+                          }}
+                        >
+                          {link.quarterly_outcomes?.summary}
+                        </div>
+                        {link.contribution_note && (
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: "#166534",
+                              marginTop: "4px",
+                              fontStyle: "italic",
+                            }}
+                          >
+                            "{link.contribution_note}"
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "10px",
-            }}
-          >
-            <div>
-              <label style={lbl}>Team</label>
-              <select
-                style={{ ...inp, cursor: "pointer" }}
-                value={form.team_id || ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, team_id: e.target.value }))
-                }
-              >
-                <option value="">— No team —</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={lbl}>Owner</label>
-              <input
-                style={inp}
-                value={form.owner || ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, owner: e.target.value }))
-                }
-              />
-            </div>
-          </div>
+              {/* Doc link */}
+              {form.doc_url && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: "700",
+                      color: "var(--blue)",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Discovery document
+                  </div>
+                  <a
+                    href={form.doc_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--blue)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <span
+                      style={{
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {form.doc_url}
+                    </span>
+                    <span>↗</span>
+                  </a>
+                </div>
+              )}
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "10px",
-            }}
-          >
-            <div>
-              <label style={lbl}>Quarter (from position)</label>
-              <input
-                style={{
-                  ...inp,
-                  background: "var(--bg)",
-                  color: "var(--slate)",
-                }}
-                value={form.quarter || "—"}
-                readOnly
-              />
-            </div>
-            <div>
-              <label style={lbl}>Financial year</label>
-              <select
-                style={{ ...inp, cursor: "pointer" }}
-                value={form.financial_year || CURRENT_YEAR}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, financial_year: e.target.value }))
-                }
-              >
-                {FINANCIAL_YEARS.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+              {/* Jira ref */}
+              {form.jira_ref && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: "700",
+                      color: "var(--blue)",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Jira
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontFamily: "monospace",
+                      color: "var(--navy)",
+                      background: "var(--bg)",
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    {form.jira_ref}
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            // ── Edit mode ──
+            <>
+              <div>
+                <label style={lbl}>Description</label>
+                <textarea
+                  style={{ ...inp, minHeight: "64px", resize: "vertical" }}
+                  placeholder="Plain English — what does this feature do?"
+                  value={form.description || ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, description: e.target.value }))
+                  }
+                />
+              </div>
 
-          <div
-            style={{ borderTop: "1px solid var(--border)", paddingTop: "12px" }}
-          >
-            <div
-              style={{
-                fontSize: "11px",
-                fontWeight: "700",
-                color: "var(--blue)",
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                marginBottom: "10px",
-              }}
-            >
-              Strategic context
-            </div>
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
-            >
               <div
                 style={{
                   display: "grid",
@@ -1314,174 +1837,408 @@ function ItemDetailPanel({ item, pillars, goals, teams, onClose, onSaved, onDele
                 }}
               >
                 <div>
-                  <label style={lbl}>Pillar</label>
+                  <label style={lbl}>Type</label>
                   <select
                     style={{ ...inp, cursor: "pointer" }}
-                    value={form.pillar_id || ""}
+                    value={form.type}
                     onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        pillar_id: e.target.value,
-                        goal_id: "",
-                      }))
+                      setForm((f) => ({ ...f, type: e.target.value }))
                     }
                   >
-                    <option value="">— Select —</option>
-                    {pillars.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
+                    {ITEM_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label style={lbl}>KPI focus</label>
+                  <label style={lbl}>Status</label>
                   <select
                     style={{ ...inp, cursor: "pointer" }}
-                    value={form.goal_id || ""}
+                    value={form.status}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, goal_id: e.target.value }))
+                      setForm((f) => ({ ...f, status: e.target.value }))
                     }
-                    disabled={!form.pillar_id}
                   >
-                    <option value="">— Select —</option>
-                    {goals
-                      .filter((g) => g.pillar_id === form.pillar_id)
-                      .map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.kpi_name}
-                        </option>
-                      ))}
+                    {STATUSES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "10px",
+                }}
+              >
+                <div>
+                  <label style={lbl}>Team</label>
+                  <select
+                    style={{ ...inp, cursor: "pointer" }}
+                    value={form.team_id || ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, team_id: e.target.value }))
+                    }
+                  >
+                    <option value="">— No team —</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>Financial year</label>
+                  <select
+                    style={{ ...inp, cursor: "pointer" }}
+                    value={form.financial_year || CURRENT_YEAR}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, financial_year: e.target.value }))
+                    }
+                  >
+                    {FINANCIAL_YEARS.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
-                <label style={lbl}>Value statement</label>
+                <label style={lbl}>Hypothesis</label>
                 <textarea
-                  style={{ ...inp, minHeight: "56px", resize: "vertical" }}
-                  value={form.value_statement || ""}
+                  style={{ ...inp, minHeight: "80px", resize: "vertical" }}
+                  placeholder="We believe that [this feature] will [move this driver] because [reasoning]"
+                  value={form.hypothesis || ""}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, value_statement: e.target.value }))
+                    setForm((f) => ({ ...f, hypothesis: e.target.value }))
                   }
-                  placeholder="Why was this selected?"
                 />
               </div>
-              <div>
-                <label style={lbl}>Lead metric</label>
-                <input
-                  style={inp}
-                  value={form.lead_metric_name || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, lead_metric_name: e.target.value }))
-                  }
-                  placeholder="e.g. Average handling time"
-                />
-              </div>
-            </div>
-          </div>
 
-          <div
-            style={{ borderTop: "1px solid var(--border)", paddingTop: "12px" }}
-          >
-            <div
-              style={{
-                fontSize: "11px",
-                fontWeight: "700",
-                color: "var(--blue)",
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                marginBottom: "10px",
-              }}
-            >
-              References
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <div>
-                <label style={lbl}>Jira ref</label>
-                <input style={inp} value={form.jira_ref || ""} onChange={(e) => setForm((f) => ({ ...f, jira_ref: e.target.value }))} placeholder="e.g. SF-1951" />
-              </div>
-              <div>
-                <label style={lbl}>Doc URL</label>
-                <input style={inp} value={form.doc_url || ""} onChange={(e) => setForm((f) => ({ ...f, doc_url: e.target.value }))} placeholder="https://..." />
-                {form.doc_url && (
-                  <a href={form.doc_url} target="_blank" rel="noreferrer" style={{ fontSize: "10px", color: "var(--blue)", marginTop: "3px", display: "block" }}>Open ↗</a>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
-            <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--blue)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "10px" }}>
-              Contributing to outcomes
-            </div>
-            {loadingLinks ? (
-              <p style={{ fontSize: "11px", color: "var(--slate-light)" }}>Loading...</p>
-            ) : itemLinks.length === 0 ? (
-              <p style={{ fontSize: "11px", color: "var(--slate-light)", fontStyle: "italic", lineHeight: "1.5" }}>
-                Not linked to any outcomes yet — click an outcome on the roadmap to link this feature.
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {itemLinks.map(link => (
-                  <div key={link.id} style={{ border: "1px solid var(--border)", borderRadius: "6px", padding: "8px 10px", background: "var(--bg)", display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "11px", fontWeight: "600", color: "var(--navy)" }}>
-                        {link.quarterly_outcomes?.quarter} · {link.quarterly_outcomes?.financial_year}
-                      </div>
-                      <div style={{ fontSize: "10px", color: "var(--slate)", marginTop: "2px", lineHeight: "1.4" }}>
-                        {link.quarterly_outcomes?.summary}
-                      </div>
-                      {link.contribution_note && (
-                        <div style={{ fontSize: "10px", color: "var(--blue)", marginTop: "3px", fontStyle: "italic" }}>
-                          "{link.contribution_note}"
-                        </div>
-                      )}
+              <div
+                style={{
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "700",
+                    color: "var(--blue)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    marginBottom: "10px",
+                  }}
+                >
+                  Strategic context
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "10px",
+                    }}
+                  >
+                    <div>
+                      <label style={lbl}>Pillar</label>
+                      <select
+                        style={{ ...inp, cursor: "pointer" }}
+                        value={form.pillar_id || ""}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            pillar_id: e.target.value,
+                            goal_id: "",
+                          }))
+                        }
+                      >
+                        <option value="">— Select —</option>
+                        {pillars.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <button onClick={() => removeItemLink(link.id)} style={{ fontSize: "10px", color: "var(--slate-light)", background: "transparent", border: "1px solid var(--border)", borderRadius: "4px", padding: "2px 6px", cursor: "pointer", fontFamily: "DM Sans, sans-serif", flexShrink: 0 }}>
-                      Unlink
-                    </button>
+                    <div>
+                      <label style={lbl}>KPI focus</label>
+                      <select
+                        style={{ ...inp, cursor: "pointer" }}
+                        value={form.goal_id || ""}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, goal_id: e.target.value }))
+                        }
+                        disabled={!form.pillar_id}
+                      >
+                        <option value="">— Select —</option>
+                        {filteredGoals.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.kpi_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                ))}
+                  <div>
+                    <label style={lbl}>Lead metric this item moves</label>
+                    <input
+                      style={inp}
+                      value={form.lead_metric_name || ""}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          lead_metric_name: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g. Average handling time"
+                    />
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
 
+              <div
+                style={{
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "700",
+                    color: "var(--blue)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    marginBottom: "10px",
+                  }}
+                >
+                  References
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "10px",
+                  }}
+                >
+                  <div>
+                    <label style={lbl}>Jira ref</label>
+                    <input
+                      style={inp}
+                      value={form.jira_ref || ""}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, jira_ref: e.target.value }))
+                      }
+                      placeholder="e.g. SF-1951"
+                    />
+                  </div>
+                  <div>
+                    <label style={lbl}>Doc URL</label>
+                    <input
+                      style={inp}
+                      value={form.doc_url || ""}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, doc_url: e.target.value }))
+                      }
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        <div style={{ padding: "14px 22px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", bottom: 0, background: "#fff" }}>
-          <button onClick={() => setCD(true)} style={{ padding: "7px 14px", borderRadius: "6px", border: "1px solid var(--border)", background: "transparent", fontSize: "12px", color: "var(--slate-light)", cursor: "pointer", fontFamily: "DM Sans, sans-serif" }}>
+        {/* Footer */}
+        <div
+          style={{
+            padding: "14px 22px",
+            borderTop: "1px solid var(--border)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            position: "sticky",
+            bottom: 0,
+            background: "#fff",
+          }}
+        >
+          <button
+            onClick={() => setCD(true)}
+            style={{
+              padding: "7px 14px",
+              borderRadius: "6px",
+              border: "1px solid var(--border)",
+              background: "transparent",
+              fontSize: "12px",
+              color: "var(--slate-light)",
+              cursor: "pointer",
+              fontFamily: "DM Sans, sans-serif",
+            }}
+          >
             Delete
           </button>
           <div style={{ display: "flex", gap: "8px" }}>
-            <button onClick={onClose} style={{ padding: "7px 14px", borderRadius: "6px", border: "1px solid var(--border)", background: "#fff", fontSize: "12px", color: "var(--slate)", cursor: "pointer", fontFamily: "DM Sans, sans-serif" }}>
-              Cancel
-            </button>
-            <button onClick={save} disabled={saving} style={{ padding: "7px 14px", borderRadius: "6px", border: "none", background: "var(--blue)", fontSize: "12px", fontWeight: "600", color: "#fff", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "DM Sans, sans-serif" }}>
-              {saving ? "Saving…" : "Save"}
-            </button>
+            {mode === "read" ? (
+              <button
+                onClick={() => setMode("edit")}
+                style={{
+                  padding: "7px 18px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "var(--navy)",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontFamily: "DM Sans, sans-serif",
+                }}
+              >
+                Edit
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setMode("read")}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--border)",
+                    background: "#fff",
+                    fontSize: "12px",
+                    color: "var(--slate)",
+                    cursor: "pointer",
+                    fontFamily: "DM Sans, sans-serif",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  style={{
+                    padding: "7px 18px",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: "var(--blue)",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    color: "#fff",
+                    cursor: saving ? "not-allowed" : "pointer",
+                    opacity: saving ? 0.7 : 1,
+                    fontFamily: "DM Sans, sans-serif",
+                  }}
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {confirmDelete && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
-            <div style={{ background: "#fff", borderRadius: "12px", width: "360px", padding: "28px", boxShadow: "0 24px 48px rgba(0,0,0,0.2)" }}>
-              <h3 className="font-display" style={{ fontSize: "16px", color: "var(--navy)", marginBottom: "8px" }}>Delete this item?</h3>
-              <p style={{ fontSize: "12px", color: "var(--slate)", marginBottom: "20px", lineHeight: "1.5" }}>
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(15,23,42,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 200,
+            }}
+          >
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: "12px",
+                width: "360px",
+                padding: "28px",
+                boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
+              }}
+            >
+              <h3
+                className="font-display"
+                style={{
+                  fontSize: "16px",
+                  color: "var(--navy)",
+                  marginBottom: "8px",
+                }}
+              >
+                Delete this item?
+              </h3>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--slate)",
+                  marginBottom: "20px",
+                  lineHeight: "1.5",
+                }}
+              >
                 <strong>{item.title}</strong> will be permanently removed.
               </p>
-              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                <button onClick={() => setCD(false)} style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid var(--border)", background: "#fff", fontSize: "12px", color: "var(--slate)", cursor: "pointer", fontFamily: "DM Sans, sans-serif" }}>Cancel</button>
-                <button onClick={del} style={{ padding: "8px 16px", borderRadius: "6px", border: "none", background: "#991B1B", fontSize: "12px", fontWeight: "600", color: "#fff", cursor: "pointer", fontFamily: "DM Sans, sans-serif" }}>Delete</button>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "8px",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button
+                  onClick={() => setCD(false)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--border)",
+                    background: "#fff",
+                    fontSize: "12px",
+                    color: "var(--slate)",
+                    cursor: "pointer",
+                    fontFamily: "DM Sans, sans-serif",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={del}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: "#991B1B",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    color: "#fff",
+                    cursor: "pointer",
+                    fontFamily: "DM Sans, sans-serif",
+                  }}
+                >
+                  Delete
+                </button>
               </div>
             </div>
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }
-
-
 
 // ── Add Item Modal ──────────────────────────────────────────────────────────
 function AddItemModal({
@@ -1497,23 +2254,19 @@ function AddItemModal({
   const [form, setForm] = useState({
     title: "",
     type: "dev",
-    track: "delivery",
     status: "to_do",
     quarter: "Q1",
     financial_year: CURRENT_YEAR,
-    owner: "",
+    team_id: defaultTeamId || "",
     pillar_id: defaultPillarId || "",
     goal_id: defaultGoalId || "",
-    team_id: defaultTeamId || "",
-    value_statement: "",
-    lead_metric_name: "",
-    jira_ref: "",
-    doc_url: "",
-    ...defaultWeeks("Q1"),
+    hypothesis: "",
+    description: "",
+    start_week: quarterStartWeek("Q1"),
+    end_week: quarterStartWeek("Q1") + WEEKS_PER_MONTH,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const filteredGoals = goals.filter((g) => g.pillar_id === form.pillar_id);
 
   async function save() {
     if (!form.title.trim()) return setError("Title is required");
@@ -1525,16 +2278,13 @@ function AddItemModal({
       status: form.status,
       quarter: form.quarter,
       financial_year: form.financial_year,
-      owner: form.owner || null,
+      team_id: form.team_id || null,
       pillar_id: form.pillar_id || null,
       goal_id: form.goal_id || null,
-      team_id: form.team_id || null,
-      value_statement: form.value_statement || null,
-      lead_metric_name: form.lead_metric_name || null,
-      jira_ref: form.jira_ref || null,
-      doc_url: form.doc_url || null,
+      hypothesis: form.hypothesis || null,
       start_week: form.start_week,
       end_week: form.end_week,
+      description: form.description || null,
     });
     setSaving(false);
     if (error) return setError(error.message);
@@ -1561,13 +2311,7 @@ function AddItemModal({
     marginBottom: "4px",
     display: "block",
   };
-  const cm = confidenceMeta(confidenceLevel(form));
-  const missing = [
-    !form.pillar_id && "Pillar",
-    !form.goal_id && "KPI",
-    !form.value_statement && "Value",
-    !form.lead_metric_name && "Metric",
-  ].filter(Boolean);
+  const filteredGoals = goals.filter((g) => g.pillar_id === form.pillar_id);
 
   return (
     <div
@@ -1585,64 +2329,31 @@ function AddItemModal({
         style={{
           background: "#fff",
           borderRadius: "12px",
-          width: "540px",
+          width: "500px",
           maxHeight: "90vh",
           overflow: "auto",
           padding: "28px",
           boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
         }}
       >
-        <div
-          style={{
-            marginBottom: "16px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-          }}
-        >
-          <div>
-            <h2
-              className="font-display"
-              style={{
-                fontSize: "18px",
-                color: "var(--navy)",
-                marginBottom: "3px",
-              }}
-            >
-              Add roadmap item
-            </h2>
-            <p style={{ fontSize: "12px", color: "var(--slate)" }}>
-              Only title is required.
-            </p>
-          </div>
-          <div
+        <div style={{ marginBottom: "20px" }}>
+          <h2
+            className="font-display"
             style={{
-              padding: "6px 10px",
-              borderRadius: "6px",
-              background: cm.bg,
-              textAlign: "right",
-              flexShrink: 0,
-              marginLeft: "12px",
+              fontSize: "18px",
+              color: "var(--navy)",
+              marginBottom: "4px",
             }}
           >
-            <div
-              style={{
-                fontSize: "9px",
-                fontWeight: "700",
-                color: cm.color,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-              }}
-            >
-              {cm.label} confidence
-            </div>
-            <div style={{ fontSize: "10px", color: cm.color }}>
-              {4 - missing.length}/4
-            </div>
-          </div>
+            Add roadmap item
+          </h2>
+          <p style={{ fontSize: "12px", color: "var(--slate)" }}>
+            Just the essentials — everything else can be filled in from the item
+            panel.
+          </p>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           <div>
             <label style={lbl}>Title *</label>
             <input
@@ -1716,7 +2427,7 @@ function AddItemModal({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
+              gridTemplateColumns: "1fr 1fr",
               gap: "10px",
             }}
           >
@@ -1738,117 +2449,70 @@ function AddItemModal({
               </select>
             </div>
             <div>
-              <label style={lbl}>Owner</label>
-              <input
-                style={inp}
-                placeholder="e.g. Cameron"
-                value={form.owner}
+              <label style={lbl}>Pillar</label>
+              <select
+                style={{ ...inp, cursor: "pointer" }}
+                value={form.pillar_id}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, owner: e.target.value }))
+                  setForm((f) => ({
+                    ...f,
+                    pillar_id: e.target.value,
+                    goal_id: "",
+                  }))
                 }
-              />
-            </div>
-            <div>
-              <label style={lbl}>Jira ref</label>
-              <input
-                style={inp}
-                placeholder="e.g. SF-1951"
-                value={form.jira_ref}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, jira_ref: e.target.value }))
-                }
-              />
+              >
+                <option value="">— Select —</option>
+                {pillars.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          <div
-            style={{ borderTop: "1px solid var(--border)", paddingTop: "12px" }}
-          >
-            <div
-              style={{
-                fontSize: "11px",
-                fontWeight: "700",
-                color: "var(--blue)",
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                marginBottom: "10px",
-              }}
-            >
-              Strategic context
+          {form.pillar_id && (
+            <div>
+              <label style={lbl}>KPI focus</label>
+              <select
+                style={{ ...inp, cursor: "pointer" }}
+                value={form.goal_id}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, goal_id: e.target.value }))
+                }
+              >
+                <option value="">— Select —</option>
+                {filteredGoals.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.kpi_name}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
-            >
-              <div
+          )}
+
+          <div>
+            <label style={lbl}>
+              Hypothesis{" "}
+              <span
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "10px",
+                  color: "var(--slate-light)",
+                  fontWeight: "400",
+                  textTransform: "none",
+                  letterSpacing: 0,
                 }}
               >
-                <div>
-                  <label style={lbl}>Pillar</label>
-                  <select
-                    style={{ ...inp, cursor: "pointer" }}
-                    value={form.pillar_id}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        pillar_id: e.target.value,
-                        goal_id: "",
-                      }))
-                    }
-                  >
-                    <option value="">— Select —</option>
-                    {pillars.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={lbl}>KPI focus</label>
-                  <select
-                    style={{ ...inp, cursor: "pointer" }}
-                    value={form.goal_id}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, goal_id: e.target.value }))
-                    }
-                    disabled={!form.pillar_id}
-                  >
-                    <option value="">— Select —</option>
-                    {filteredGoals.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.kpi_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label style={lbl}>Value statement</label>
-                <textarea
-                  style={{ ...inp, minHeight: "52px", resize: "vertical" }}
-                  placeholder="Why was this selected?"
-                  value={form.value_statement}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, value_statement: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label style={lbl}>Lead metric</label>
-                <input
-                  style={inp}
-                  placeholder="e.g. Average handling time"
-                  value={form.lead_metric_name}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, lead_metric_name: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
+                (optional)
+              </span>
+            </label>
+            <textarea
+              style={{ ...inp, minHeight: "68px", resize: "vertical" }}
+              placeholder="We believe that [this feature] will [move this driver] because [reasoning]"
+              value={form.hypothesis}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, hypothesis: e.target.value }))
+              }
+            />
           </div>
 
           {error && (
@@ -1931,7 +2595,9 @@ export default function Roadmap() {
   const [collapsedPillars, setCollapsedPillars] = useState({});
   const [collapsedTeams, setCollapsedTeams] = useState({});
   const saveTimer = useRef({});
-  const [mappingOutcome, setMappingOutcome] = useState(null)
+  const [mappingOutcome, setMappingOutcome] = useState(null);
+  const [addingOutcome, setAddingOutcome] = useState(null); // { pillarId, goalId, goal };
+  const [filterPillar, setFilterPillar] = useState("");
 
   async function loadAll() {
     const [ir, pr, gr, tr, or] = await Promise.all([
@@ -1967,7 +2633,10 @@ export default function Roadmap() {
 
   // Build row structure
   const rows = [];
-  pillars.forEach((pillar) => {
+  const visiblePillars = filterPillar
+    ? (pillars || []).filter((p) => p.id === filterPillar)
+    : pillars || [];
+  visiblePillars.forEach((pillar) => {
     const pillarGoals = goals.filter((g) => g.pillar_id === pillar.id);
     const isCollapsed = collapsedPillars[pillar.id];
     rows.push({ type: "pillar", pillar, isCollapsed });
@@ -1994,23 +2663,56 @@ export default function Roadmap() {
       });
       if (pillarGoals.length === 0) {
         rows.push({ type: "empty", pillar });
+
+        // Unassigned row — items linked to pillar but no goal/team
+        rows.push({ type: "unassigned", pillar });
       }
     }
   });
 
   // Y positions
-  const rowH = (r) => {
+  const rowH = (r, laneCount = 1) => {
     if (r.type === "pillar") return PILLAR_H;
     if (r.type === "kpi") return 28;
-    if (r.type === "team") return r.isCollapsed ? 20 : TEAM_H;
+    if (r.type === "team")
+      return r.isCollapsed
+        ? 20
+        : Math.max(TEAM_H, laneCount * (TEAM_H - 4) + 8);
     if (r.type === "outcome") return OUTCOME_H;
     if (r.type === "empty") return TEAM_H;
+    if (r.type === "unassigned") return TEAM_H;
     return TEAM_H;
   };
+  // Pre-calculate lane counts per row
+  const laneMaps = rows.map((row) => {
+    if (row.type === "team" && !row.isCollapsed && row.goal) {
+      const rowItems = items.filter(
+        (item) =>
+          item.goal_id === row.goal.id &&
+          item.team_id === row.team.id &&
+          item.financial_year === filterYear &&
+          (filterConfidence === "all" ||
+            confidenceLevel(item) === filterConfidence),
+      );
+      return assignLanes(rowItems);
+    }
+    if (row.type === "unassigned") {
+      const rowItems = items.filter(
+        (item) =>
+          item.pillar_id === row.pillar.id &&
+          !item.goal_id &&
+          item.financial_year === filterYear,
+      );
+      return assignLanes(rowItems);
+    }
+    return { laneMap: {}, laneCount: 1 };
+  });
+
+  // Y positions using dynamic row heights
   let cy = HEADER_H;
-  const rowYs = rows.map((r) => {
+  const rowYs = rows.map((r, i) => {
     const y = cy;
-    cy += rowH(r);
+    cy += rowH(r, laneMaps[i].laneCount);
     return y;
   });
   const totalH = cy;
@@ -2082,11 +2784,23 @@ export default function Roadmap() {
           </select>
           <select
             style={sel}
+            value={filterPillar}
+            onChange={(e) => setFilterPillar(e.target.value)}
+          >
+            <option value="">All pillars</option>
+            {(pillars || []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <select
+            style={sel}
             value={filterTeam}
             onChange={(e) => setFilterTeam(e.target.value)}
           >
             <option value="">All teams</option>
-            {teams.map((t) => (
+            {(teams || []).map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
               </option>
@@ -2222,7 +2936,7 @@ export default function Roadmap() {
                     textTransform: "uppercase",
                   }}
                 >
-                  Pillar / KPI / Team
+                  Pillar / Product focus / Team
                 </span>
               </div>
 
@@ -2331,7 +3045,7 @@ export default function Roadmap() {
                     <div
                       key={i}
                       style={{
-                        height: h,
+                        height: rowH(row, laneMaps[i].laneCount),
                         display: "flex",
                         alignItems: "center",
                         padding: "0 10px 0 28px",
@@ -2406,9 +3120,10 @@ export default function Roadmap() {
                     <div
                       key={i}
                       style={{
-                        height: h,
+                        height: rowH(row, laneMaps[i]?.laneCount ?? 1),
                         display: "flex",
-                        alignItems: "center",
+                        flexDirection: "column",
+                        justifyContent: "center",
                         padding: "0 12px 0 20px",
                         borderBottom: "1px solid var(--border)",
                         background: "#F0FDF4",
@@ -2426,6 +3141,25 @@ export default function Roadmap() {
                       >
                         Outcomes
                       </span>
+                      {row.goal?.lead_metric_name && (
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            color: "#166534",
+                            marginTop: "2px",
+                            opacity: 0.7,
+                          }}
+                        >
+                          Measuring: {row.goal.lead_metric_name}
+                          {row.goal.lead_metric_baseline &&
+                            row.goal.lead_metric_target && (
+                              <span style={{ marginLeft: "4px", opacity: 0.8 }}>
+                                ({row.goal.lead_metric_baseline} →{" "}
+                                {row.goal.lead_metric_target})
+                              </span>
+                            )}
+                        </span>
+                      )}
                     </div>
                   );
                 if (row.type === "empty")
@@ -2448,8 +3182,59 @@ export default function Roadmap() {
                           fontStyle: "italic",
                         }}
                       >
-                        No KPI focus — add one in Pillars & Goals
+                        No product focus — add one in Pillars & Goals
                       </span>
+                    </div>
+                  );
+                if (row.type === "unassigned")
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        height: h,
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "0 12px 0 20px",
+                        borderBottom: "1px solid var(--border)",
+                        background: "#FFFBEB",
+                        borderLeft: `3px solid ${row.pillar.colour}`,
+                        gap: "6px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          fontWeight: "600",
+                          color: "#92400E",
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Unassigned
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddCtx({ pillar_id: row.pillar.id });
+                          setShowAdd(true);
+                        }}
+                        style={{
+                          width: "18px",
+                          height: "18px",
+                          borderRadius: "3px",
+                          border: "1px solid var(--border)",
+                          background: "transparent",
+                          color: "var(--slate-light)",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        +
+                      </button>
                     </div>
                   );
                 return null;
@@ -2576,7 +3361,7 @@ export default function Roadmap() {
                 {/* Row backgrounds + lines */}
                 {rows.map((row, i) => {
                   const y = rowYs[i];
-                  const h = rowH(row);
+                  const h = rowH(row, laneMaps[i]?.laneCount ?? 1);
                   return (
                     <g key={`rb${i}`}>
                       {row.type === "pillar" && (
@@ -2595,6 +3380,15 @@ export default function Roadmap() {
                           width={TOTAL_W}
                           height={h}
                           fill="#F0FDF4"
+                        />
+                      )}
+                      {row.type === "unassigned" && (
+                        <rect
+                          x={0}
+                          y={y}
+                          width={TOTAL_W}
+                          height={h}
+                          fill="#FFFBEB"
                         />
                       )}
                       {row.type === "kpi" && (
@@ -2646,6 +3440,7 @@ export default function Roadmap() {
                 {rows.map((row, i) => {
                   if (row.type !== "team" || row.isCollapsed) return null;
                   const rowY = rowYs[i];
+                  const { laneMap = {} } = laneMaps[i] || {};
                   const rowItems = items.filter(
                     (item) =>
                       item.goal_id === row.goal.id &&
@@ -2659,28 +3454,30 @@ export default function Roadmap() {
                       key={item.id}
                       item={item}
                       rowY={rowY}
+                      lane={laneMap[item.id] ?? 0}
                       onUpdate={handleUpdate}
                       onClick={setSelected}
                     />
                   ));
                 })}
 
-                {/* Unassigned items (no team) */}
+                {/* Unassigned items */}
                 {rows.map((row, i) => {
-                  if (row.type !== "kpi") return null;
+                  if (row.type !== "unassigned") return null;
                   const rowY = rowYs[i];
-                  const unassigned = items.filter(
+                  const { laneMap = {} } = laneMaps[i] || {};
+                  const rowItems = items.filter(
                     (item) =>
-                      item.goal_id === row.goal.id &&
-                      !item.team_id &&
+                      item.pillar_id === row.pillar.id &&
+                      !item.goal_id &&
                       item.financial_year === filterYear,
                   );
-                  if (unassigned.length === 0) return null;
-                  return unassigned.map((item) => (
+                  return rowItems.map((item) => (
                     <TimelineItem
                       key={item.id}
                       item={item}
                       rowY={rowY}
+                      lane={laneMap[item.id] ?? 0}
                       onUpdate={handleUpdate}
                       onClick={setSelected}
                     />
@@ -2722,6 +3519,7 @@ export default function Roadmap() {
                             items={items}
                             onReload={loadAll}
                             onOpenMapping={setMappingOutcome}
+                            onAddOutcome={() => setAddingOutcome( { pillarId: row.pillar.id, goalId: row.goal.id, goal: { ...row.goal, quarter: q }, quarter: q })}
                           />
                         </div>
                       </foreignObject>
@@ -2755,10 +3553,25 @@ export default function Roadmap() {
           outcome={mappingOutcome}
           items={items}
           onClose={() => setMappingOutcome(null)}
-          onSaved={() => { setMappingOutcome(null); loadAll() }}
+          onSaved={() => {
+            setMappingOutcome(null);
+            loadAll();
+          }}
         />
       )}
-
+      {addingOutcome && (
+        <AddOutcomeModal
+          pillarId={addingOutcome.pillarId}
+          goalId={addingOutcome.goalId}
+          goal={addingOutcome.goal}
+          quarter={addingOutcome.quarter}
+          year={filterYear}
+          filterTeam={filterTeam}
+          teams={teams}
+          onClose={() => setAddingOutcome(null)}
+          onSaved={() => { setAddingOutcome(null); loadAll() }}
+        />
+      )}
       {selected && (
         <ItemDetailPanel
           item={selected}
