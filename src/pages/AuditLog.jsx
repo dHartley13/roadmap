@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 
 const EVENT_META = {
   item_moved:     { label: 'Feature moved',    color: '#1E40AF', bg: '#DBEAFE' },
-  item_resized:   { label: 'Feature resized',  color: '#0369A1', bg: '#E0F2FE' },
+  item_resized:   { label: 'Feature resized',  color: '#92400E', bg: '#FEF3C7' },
   item_updated:   { label: 'Feature updated',  color: '#0F766E', bg: '#CCFBF1' },
   item_created:   { label: 'Feature added',    color: '#166534', bg: '#DCFCE7' },
   item_deleted:   { label: 'Feature deleted',  color: '#991B1B', bg: '#FEE2E2' },
