@@ -1,5 +1,13 @@
 import { supabase } from './supabase'
 
+function weekToLabel(week) {
+  if (week === undefined || week === null) return '—'
+  const monthIdx = Math.floor(week / 4)
+  const weekNum  = (week % 4) + 1
+  const month    = MONTHS[monthIdx] || '—'
+  return `${month} W${weekNum}`
+}
+
 export async function logEvent({
   eventType,
   entityType,

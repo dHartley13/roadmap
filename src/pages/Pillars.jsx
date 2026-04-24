@@ -630,7 +630,7 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, onClose, onSaved }) {
   async function save() {
     if (!form.kpi_name.trim()) return setError("Please select or enter a KPI");
     setSaving(true);
-    const { error } = await supabase.from("goals").insert({
+    const { data, error } = await supabase.from("goals").insert({
       pillar_id: pillarId,
       kpi_name: form.kpi_name.trim(),
       kpi_baseline: form.kpi_baseline.trim() || null,
@@ -640,9 +640,25 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, onClose, onSaved }) {
       lead_metric_name: form.lead_metric_name.trim() || null,
       lead_metric_baseline: form.lead_metric_baseline.trim() || null,
       lead_metric_target: form.lead_metric_target.trim() || null,
-    });
+    }).select().single()
     setSaving(false);
     if (error) return setError(error.message);
+
+    //Adit log
+    await logEvent({
+      eventType: 'kpi_created',
+      entityType: 'goal',
+      entityId: data?.id || 'unknown',
+      entityName: form.kpi_name,
+      pillarId: pillarId,
+      newValue: {
+        kpi_name: form.kpi_name,
+        kpi_target: form.kpi_target,
+        driver_statement: form.driver_statement,
+        lead_metric_name: form.lead_metric_name,
+      },
+    })
+
     onSaved();
   }
 
@@ -1361,6 +1377,25 @@ function PillarRow({ pillar, onReload }) {
   }
 
   async function deleteGoal(goalId) {
+
+    //Audit log
+    const goal = goals.find(g => g.id === goalId)
+    console.log('deleteGoal called', goalId, goal, goals) //debug
+    if (goal) {
+      await logEvent({
+        eventType: 'kpi_deleted',
+        entityType: 'goal',
+        entityId: goalId,
+        entityName: goal.kpi_name,
+        pillarId: pillar.id,
+        oldValue: {
+          kpi_name: goal.kpi_name,
+          driver_statement: goal.driver_statement,
+          lead_metric_name: goal.lead_metric_name,
+        },
+      })
+    }
+
     await supabase.from("goals").delete().eq("id", goalId);
     loadGoals();
   }

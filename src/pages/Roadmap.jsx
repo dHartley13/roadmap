@@ -1206,6 +1206,21 @@ function OutcomeCell({
   }
 
   async function deleteOutcome(id) {
+
+    //Audit log
+    const outcome = outcomes.find(o => o.id === id)
+    if (outcome) {
+      await logEvent({
+        eventType: 'outcome_deleted',
+        entityType: 'quarterly_outcome',
+        entityId: id,
+        entityName: outcome.summary,
+        pillarId: outcome.pillar_id || null,
+        teamId: outcome.team_id || null,
+        oldValue: { quarter: outcome.quarter, summary: outcome.summary },
+      })
+    }
+
     await supabase.from("quarterly_outcomes").delete().eq("id", id);
     onReload();
   }
@@ -1387,6 +1402,22 @@ function ItemDetailPanel({
   }
 
   async function del() {
+
+    //Audit log
+    await logEvent({
+      eventType: 'item_deleted',
+      entityType: 'roadmap_item',
+      entityId: item.id,
+      entityName: item.title,
+      pillarId: item.pillar_id || null,
+      teamId: item.team_id || null,
+      oldValue: {
+        type: item.type,
+        quarter: item.quarter,
+        status: item.status,
+      },
+    })
+
     await supabase.from("roadmap_items").delete().eq("id", item.id);
     onDeleted();
   }
@@ -2287,7 +2318,7 @@ function AddItemModal({
   async function save() {
     if (!form.title.trim()) return setError("Title is required");
     setSaving(true);
-    const { error } = await supabase.from("roadmap_items").insert({
+    const { data: result, error } = await supabase.from("roadmap_items").insert({
       title: form.title.trim(),
       type: form.type,
       track: "delivery",
@@ -2301,9 +2332,25 @@ function AddItemModal({
       start_week: form.start_week,
       end_week: form.end_week,
       description: form.description || null,
-    });
+    }).select().single()
     setSaving(false);
     if (error) return setError(error.message);
+
+    //Audit log
+    await logEvent({
+      eventType: 'item_created',
+      entityType: 'roadmap_item',
+      entityId: result?.id || 'unknown',
+      entityName: form.title.trim(),
+      pillarId: form.pillar_id || null,
+      teamId: form.team_id || null,
+      newValue: {
+        type: form.type,
+        quarter: form.quarter,
+        financial_year: form.financial_year,
+        duration_weeks: form.end_week - form.start_week,
+      },
+    })
     onSaved();
   }
 
@@ -2615,6 +2662,7 @@ export default function Roadmap() {
   const [addingOutcome, setAddingOutcome] = useState(null); // { pillarId, goalId, goal };
   const [filterPillar, setFilterPillar] = useState("");
 
+
   async function loadAll() {
     const [ir, pr, gr, tr, or] = await Promise.all([
       supabase.from("roadmap_items").select("*").order("created_at"),
@@ -2636,31 +2684,42 @@ export default function Roadmap() {
   }, []);
 
   const handleUpdate = useCallback((id, changes, persist) => {
+    const originalItem = items.find(i => i.id === id)
+
     setItems(prev => prev.map(i => i.id === id ? { ...i, ...changes } : i))
     if (persist) {
       clearTimeout(saveTimer.current[id])
       saveTimer.current[id] = setTimeout(async () => {
         await supabase.from('roadmap_items').update(changes).eq('id', id)
-        const item = items.find(i => i.id === id)
-        if (item) {
-          await logEvent({
-            eventType: 'item_moved',
+        if (originalItem) {
+
+        const oldSW       = originalItem.start_week ?? 0
+        const oldEW       = originalItem.end_week ?? 4
+        const newSW       = changes.start_week ?? oldSW
+        const newEW       = changes.end_week ?? oldEW
+        const oldDuration = oldEW - oldSW
+        const newDuration = newEW - newSW
+        const isResize    = newDuration !== oldDuration
+          
+        //Audit log
+        await logEvent({
+            eventType: isResize ? 'item_resized' : 'item_moved',
             entityType: 'roadmap_item',
             entityId: id,
-            entityName: item.title,
-            pillarId: item.pillar_id || null,
-            teamId: item.team_id || null,
+            entityName: originalItem.title,
+            pillarId: originalItem.pillar_id || null,
+            teamId: originalItem.team_id || null,
             oldValue: { 
-              quarter: item.quarter, 
-              start_week: item.start_week, 
-              end_week: item.end_week,
-              duration_weeks: (item.end_week ?? 4) - (item.start_week ?? 0)
+              quarter: originalItem.quarter, 
+              start_week: oldSW, 
+              end_week: oldEW,
+              duration_weeks: oldDuration
             },
             newValue: { 
-              quarter: changes.quarter ?? item.quarter,
-              start_week: changes.start_week ?? item.start_week,
-              end_week: changes.end_week ?? item.end_week,
-              duration_weeks: (changes.end_week ?? item.end_week ?? 4) - (changes.start_week ?? item.start_week ?? 0)
+              quarter: changes.quarter ?? originalItem.quarter,
+              start_week: newSW,
+              end_week: newEW,
+              duration_weeks: newDuration
             },
           })
         }
