@@ -1364,11 +1364,390 @@ function AddPillarModal({ onClose, onSaved }) {
     </div>
   );
 }
+function EditPillarModal({ pillar, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name: pillar.name,
+    description: pillar.description || "",
+    colour: pillar.colour || PILLAR_COLOURS[0],
+    success_criteria:
+      pillar.success_criteria?.length > 0
+        ? pillar.success_criteria
+        : [{ metric: "", baseline: "", target: "" }],
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  function updateCriteria(index, field, value) {
+    setForm((f) => ({
+      ...f,
+      success_criteria: f.success_criteria.map((row, i) =>
+        i === index ? { ...row, [field]: value } : row,
+      ),
+    }));
+  }
+
+  function addCriteriaRow() {
+    setForm((f) => ({
+      ...f,
+      success_criteria: [
+        ...f.success_criteria,
+        { metric: "", baseline: "", target: "" },
+      ],
+    }));
+  }
+
+  function removeCriteriaRow(index) {
+    setForm((f) => ({
+      ...f,
+      success_criteria: f.success_criteria.filter((_, i) => i !== index),
+    }));
+  }
+
+  async function save() {
+    if (!form.name.trim()) return setError("Pillar name is required");
+    setSaving(true);
+    const cleanCriteria = form.success_criteria.filter((r) => r.metric.trim());
+    await supabase
+      .from("pillars")
+      .update({
+        name: form.name.trim(),
+        description: form.description.trim() || null,
+        colour: form.colour,
+        success_criteria: cleanCriteria,
+      })
+      .eq("id", pillar.id);
+    setSaving(false);
+    onSaved();
+  }
+
+  const inputStyle = {
+    width: "100%",
+    padding: "7px 10px",
+    border: "1px solid var(--border)",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontFamily: "DM Sans, sans-serif",
+    color: "var(--navy)",
+    background: "#fff",
+    outline: "none",
+  };
+  const labelStyle = {
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "var(--slate)",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    marginBottom: "5px",
+    display: "block",
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "12px",
+          width: "560px",
+          maxHeight: "90vh",
+          overflow: "auto",
+          padding: "32px",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: "24px",
+          }}
+        >
+          <div>
+            <h2
+              className="font-display"
+              style={{
+                fontSize: "20px",
+                color: "var(--navy)",
+                marginBottom: "4px",
+              }}
+            >
+              Edit pillar
+            </h2>
+            <p style={{ fontSize: "12px", color: "var(--slate)" }}>
+              Changes will reflect immediately across the tool.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "6px",
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--slate-light)",
+              cursor: "pointer",
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+          <div>
+            <label style={labelStyle}>Pillar name *</label>
+            <input
+              style={inputStyle}
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Description</label>
+            <textarea
+              style={{
+                ...inputStyle,
+                minHeight: "72px",
+                resize: "vertical",
+                padding: "9px 12px",
+              }}
+              value={form.description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Colour</label>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {PILLAR_COLOURS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setForm((f) => ({ ...f, colour: c }))}
+                  style={{
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "50%",
+                    background: c,
+                    border:
+                      form.colour === c
+                        ? "3px solid var(--navy)"
+                        : "2px solid transparent",
+                    cursor: "pointer",
+                    outline: form.colour === c ? "2px solid #fff" : "none",
+                    outlineOffset: "-4px",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div
+            style={{ borderTop: "1px solid var(--border)", paddingTop: "18px" }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "10px",
+              }}
+            >
+              <label style={{ ...labelStyle, marginBottom: 0 }}>
+                Success criteria
+              </label>
+              <span style={{ fontSize: "11px", color: "var(--slate-light)" }}>
+                These are your lagging KPIs
+              </span>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 100px 100px 28px",
+                gap: "6px",
+                marginBottom: "6px",
+              }}
+            >
+              {["Metric name", "Baseline", "Target", ""].map((h, i) => (
+                <div
+                  key={i}
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: "600",
+                    color: "var(--slate-light)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {h}
+                </div>
+              ))}
+            </div>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "6px" }}
+            >
+              {form.success_criteria.map((row, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 100px 100px 28px",
+                    gap: "6px",
+                    alignItems: "center",
+                  }}
+                >
+                  <input
+                    style={inputStyle}
+                    placeholder="e.g. Bookings per property"
+                    value={row.metric}
+                    onChange={(e) =>
+                      updateCriteria(i, "metric", e.target.value)
+                    }
+                  />
+                  <input
+                    style={inputStyle}
+                    placeholder="e.g. 4.2"
+                    value={row.baseline}
+                    onChange={(e) =>
+                      updateCriteria(i, "baseline", e.target.value)
+                    }
+                  />
+                  <input
+                    style={inputStyle}
+                    placeholder="e.g. 5.0"
+                    value={row.target}
+                    onChange={(e) =>
+                      updateCriteria(i, "target", e.target.value)
+                    }
+                  />
+                  <button
+                    onClick={() => removeCriteriaRow(i)}
+                    disabled={form.success_criteria.length === 1}
+                    style={{
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "4px",
+                      border: "1px solid var(--border)",
+                      background: "transparent",
+                      color: "var(--slate-light)",
+                      cursor:
+                        form.success_criteria.length === 1
+                          ? "not-allowed"
+                          : "pointer",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      opacity: form.success_criteria.length === 1 ? 0.3 : 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={addCriteriaRow}
+              style={{
+                marginTop: "8px",
+                padding: "6px 12px",
+                border: "1px dashed var(--border)",
+                borderRadius: "6px",
+                background: "transparent",
+                fontSize: "12px",
+                color: "var(--slate)",
+                cursor: "pointer",
+                fontFamily: "DM Sans, sans-serif",
+                width: "100%",
+              }}
+            >
+              + Add metric
+            </button>
+          </div>
+
+          {error && (
+            <div
+              style={{
+                fontSize: "12px",
+                color: "var(--red)",
+                background: "var(--red-bg)",
+                padding: "8px 12px",
+                borderRadius: "4px",
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              justifyContent: "flex-end",
+              paddingTop: "8px",
+            }}
+          >
+            <button
+              onClick={onClose}
+              style={{
+                padding: "9px 18px",
+                borderRadius: "6px",
+                border: "1px solid var(--border)",
+                background: "#fff",
+                fontSize: "13px",
+                fontWeight: "500",
+                color: "var(--slate)",
+                cursor: "pointer",
+                fontFamily: "DM Sans, sans-serif",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              style={{
+                padding: "9px 18px",
+                borderRadius: "6px",
+                border: "none",
+                background: "var(--blue)",
+                fontSize: "13px",
+                fontWeight: "600",
+                color: "#fff",
+                cursor: saving ? "not-allowed" : "pointer",
+                opacity: saving ? 0.7 : 1,
+                fontFamily: "DM Sans, sans-serif",
+              }}
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PillarRow({ pillar, goals, teams, items, onReload }) {
   const [expanded, setExpanded] = useState(false);
   const [showAddKPI, setShowAddKPI] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [selectedKPI, setSelectedKPI] = useState(null);
+  const [editing, setEditing] = useState(false);
 
   const pillarGoals = goals.filter((g) => g.pillar_id === pillar.id);
   const pillarItems = items.filter((i) => i.pillar_id === pillar.id);
@@ -1485,6 +1864,23 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
               {pillar.name}
             </h2>
           </div>
+          <button
+            onClick={() => setEditing(true)}
+            style={{
+              padding: "5px 12px",
+              borderRadius: "6px",
+              border: "1px solid var(--border)",
+              background: "transparent",
+              fontSize: "12px",
+              color: "var(--slate)",
+              cursor: "pointer",
+              fontFamily: "DM Sans, sans-serif",
+              marginRight: "4px",
+              flexShrink: 0,
+            }}
+          >
+            Edit
+          </button>
           <button
             onClick={() => setConfirmDelete(true)}
             style={{
@@ -1931,7 +2327,20 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
           pillarKPIs={pillar.success_criteria || []}
           teams={teams}
           onClose={() => setShowAddKPI(false)}
-          onSaved={() => { setShowAddKPI(false); onReload();
+          onSaved={() => {
+            setShowAddKPI(false);
+            onReload();
+          }}
+        />
+      )}
+
+      {editing && (
+        <EditPillarModal
+          pillar={pillar}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false);
+            onReload();
           }}
         />
       )}
