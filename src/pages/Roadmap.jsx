@@ -54,7 +54,7 @@ const WEEK_H = 20;
 const HEADER_H = QUARTER_H + MONTH_H + WEEK_H;
 const PILLAR_H = 28;
 const TEAM_H = 44;
-const OUTCOME_H = 52;
+const OUTCOME_H = 120;
 const LEFT_W = 240;
 
 const ITEM_TYPES = [
@@ -171,6 +171,7 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
   const dragRef = useRef(null);
   const tm = typeMeta(item.type);
   const cm = confidenceMeta(confidenceLevel(item));
+  const teamColour = item.team_colour || null
 
   const sw = item.start_week ?? quarterStartWeek(item.quarter || "Q1");
   const ew = item.end_week ?? sw + WEEKS_PER_MONTH;
@@ -262,8 +263,8 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
         width={w - 4}
         height={itemH}
         rx={4}
-        fill={tm.bg}
-        stroke={tm.color}
+        fill={teamColour ? teamColour + "30" : tm.bg}
+        stroke={teamColour || tm.color}
         strokeWidth={1.5}
         onMouseDown={(e) => startDrag(e, "move")}
         onClick={() => {if (!didDragRef.current) onClick(item) }}
@@ -288,7 +289,7 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
           style={{
             fontSize: "10px",
             fontWeight: "600",
-            color: tm.color,
+            color: teamColour || tm.color,
             fontFamily: "DM Sans, sans-serif",
             lineHeight: "1.3",
             overflow: "hidden",
@@ -1229,7 +1230,9 @@ function OutcomeCell({
     <div
       style={{
         padding: "4px 6px",
-        minHeight: OUTCOME_H,
+        height: OUTCOME_H,
+        maxHeight: OUTCOME_H,
+        overflow: "auto",
         display: "flex",
         flexDirection: "column",
         gap: "3px",
@@ -2665,18 +2668,22 @@ export default function Roadmap() {
 
   async function loadAll() {
     const [ir, pr, gr, tr, or] = await Promise.all([
-      supabase.from("roadmap_items").select("*").order("created_at"),
-      supabase.from("pillars").select("*").order("sort_order"),
-      supabase.from("goals").select("*"),
-      supabase.from("teams").select("*").order("sort_order"),
-      supabase.from("quarterly_outcomes").select("*"),
-    ]);
-    setItems(ir.data || []);
-    setPillars(pr.data || []);
-    setGoals(gr.data || []);
-    setTeams(tr.data || []);
-    setOutcomes(or.data || []);
-    setLoading(false);
+      supabase.from('roadmap_items').select('*').order('created_at'),
+      supabase.from('pillars').select('*').order('sort_order'),
+      supabase.from('goals').select('*'),
+      supabase.from('teams').select('*').order('sort_order'),
+      supabase.from('quarterly_outcomes').select('*'),
+    ])
+    const teamsData = tr.data || []
+    setItems((ir.data || []).map(item => ({
+      ...item,
+      team_colour: teamsData.find(t => t.id === item.team_id)?.colour || null
+    })))
+    setPillars(pr.data || [])
+    setGoals(gr.data || [])
+    setTeams(teamsData)
+    setOutcomes(or.data || [])
+    setLoading(false)
   }
 
   useEffect(() => {

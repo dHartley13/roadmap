@@ -77,9 +77,71 @@ function AddTeamModal({ onClose, onSaved }) {
     </div>
   )
 }
+function EditTeamModal({ team, onClose, onSaved }) {
+  const [form, setForm] = useState({ name: team.name, colour: team.colour })
+  const [saving, setSaving] = useState(false)
 
-function TeamRow({ team, onDeleted }) {
+  const TEAM_COLOURS = [
+    '#1E40AF', '#0F766E', '#7C3AED', '#B45309',
+    '#BE185D', '#0E7490', '#4D7C0F', '#9F1239',
+    '#C2410C', '#0369A1', '#7E22CE', '#065F46',
+  ]
+
+  async function save() {
+    setSaving(true)
+    await supabase.from('teams').update({
+      name: form.name.trim(),
+      colour: form.colour,
+    }).eq('id', team.id)
+    setSaving(false)
+    onSaved()
+  }
+
+  const inp = { width:'100%', padding:'8px 10px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px', fontFamily:'DM Sans, sans-serif', color:'var(--navy)', background:'#fff', outline:'none' }
+  const lbl = { fontSize:'10px', fontWeight:'600', color:'var(--slate)', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:'4px', display:'block' }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100 }}>
+      <div style={{ background:'#fff', borderRadius:'12px', width:'400px', padding:'28px', boxShadow:'0 24px 48px rgba(0,0,0,0.2)' }}>
+        <h2 className="font-display" style={{ fontSize:'18px', color:'var(--navy)', marginBottom:'4px' }}>Edit team</h2>
+        <p style={{ fontSize:'12px', color:'var(--slate)', marginBottom:'20px' }}>Changes will reflect immediately on the roadmap.</p>
+
+        <div style={{ display:'flex', flexDirection:'column', gap:'14px' }}>
+          <div>
+            <label style={lbl}>Team name</label>
+            <input style={inp} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <label style={lbl}>Colour</label>
+            <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+              {TEAM_COLOURS.map(c => (
+                <button key={c} onClick={() => setForm(f => ({ ...f, colour: c }))}
+                  style={{
+                    width:'26px', height:'26px', borderRadius:'50%', background:c,
+                    border: form.colour === c ? '3px solid var(--navy)' : '2px solid transparent',
+                    cursor:'pointer',
+                    outline: form.colour === c ? '2px solid #fff' : 'none',
+                    outlineOffset:'-4px'
+                  }} />
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display:'flex', gap:'8px', justifyContent:'flex-end', paddingTop:'4px' }}>
+            <button onClick={onClose} style={{ padding:'8px 16px', borderRadius:'6px', border:'1px solid var(--border)', background:'#fff', fontSize:'12px', color:'var(--slate)', cursor:'pointer', fontFamily:'DM Sans, sans-serif' }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{ padding:'8px 16px', borderRadius:'6px', border:'none', background:'var(--blue)', fontSize:'12px', fontWeight:'600', color:'#fff', cursor:saving?'not-allowed':'pointer', opacity:saving?0.7:1, fontFamily:'DM Sans, sans-serif' }}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TeamRow({ team, onDeleted, onReload }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   async function deleteTeam() {
     await supabase.from('teams').delete().eq('id', team.id)
@@ -89,33 +151,47 @@ function TeamRow({ team, onDeleted }) {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: '12px',
-      padding: '12px 16px', background: '#fff',
-      border: '1px solid var(--border)', borderRadius: '8px',
-      borderLeft: `4px solid ${team.colour}`
+      display:'flex', alignItems:'center', gap:'12px',
+      padding:'12px 16px', background:'#fff',
+      border:'1px solid var(--border)', borderRadius:'8px',
+      borderLeft:`4px solid ${team.colour}`
     }}>
-      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: team.colour, flexShrink: 0 }} />
-      <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--navy)', flex: 1 }}>{team.name}</span>
+      <div style={{ width:'10px', height:'10px', borderRadius:'50%', background:team.colour, flexShrink:0 }} />
+      <span style={{ fontSize:'13px', fontWeight:'600', color:'var(--navy)', flex:1 }}>{team.name}</span>
+      <button onClick={() => setEditing(true)} style={{
+        padding:'5px 12px', borderRadius:'6px',
+        border:'1px solid var(--border)', background:'transparent',
+        fontSize:'12px', color:'var(--slate)', cursor:'pointer',
+        fontFamily:'DM Sans, sans-serif'
+      }}>Edit</button>
       <button onClick={() => setConfirmDelete(true)} style={{
-        width: '28px', height: '28px', borderRadius: '6px',
-        border: '1px solid var(--border)', background: 'transparent',
-        color: 'var(--slate-light)', cursor: 'pointer', fontSize: '13px',
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
-      }}>✕</button>
+        width:'28px', height:'28px', borderRadius:'6px',
+        border:'1px solid #FEE2E2', background:'#FEE2E2',
+        color:'#991B1B', cursor:'pointer', fontSize:'13px',
+        display:'flex', alignItems:'center', justifyContent:'center'
+      }}>🗑</button>
+
+      {editing && (
+        <EditTeamModal
+          team={team}
+          onClose={() => setEditing(false)}
+          onSaved={() => { setEditing(false); onReload() }}
+        />
+      )}
 
       {confirmDelete && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ background: '#fff', borderRadius: '12px', width: '380px', padding: '28px', boxShadow: '0 24px 48px rgba(0,0,0,0.2)' }}>
-            <h3 className="font-display" style={{ fontSize: '16px', color: 'var(--navy)', marginBottom: '8px' }}>Delete {team.name}?</h3>
-            <p style={{ fontSize: '12px', color: 'var(--slate)', marginBottom: '8px', lineHeight: '1.5' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100 }}>
+          <div style={{ background:'#fff', borderRadius:'12px', width:'380px', padding:'28px', boxShadow:'0 24px 48px rgba(0,0,0,0.2)' }}>
+            <h3 className="font-display" style={{ fontSize:'16px', color:'var(--navy)', marginBottom:'8px' }}>Delete {team.name}?</h3>
+            <p style={{ fontSize:'12px', color:'var(--slate)', marginBottom:'8px', lineHeight:'1.5' }}>
               This will remove the team from all roadmap items it is assigned to.
             </p>
-            <p style={{ fontSize: '12px', color: '#991B1B', background: '#FEE2E2', padding: '8px 12px', borderRadius: '4px', marginBottom: '20px' }}>
+            <p style={{ fontSize:'12px', color:'#991B1B', background:'#FEE2E2', padding:'8px 12px', borderRadius:'4px', marginBottom:'20px' }}>
               This cannot be undone.
             </p>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setConfirmDelete(false)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', fontSize: '12px', color: 'var(--slate)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>Cancel</button>
-              <button onClick={deleteTeam} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#991B1B', fontSize: '12px', fontWeight: '600', color: '#fff', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>Delete</button>
+            <div style={{ display:'flex', gap:'8px', justifyContent:'flex-end' }}>
+              <button onClick={() => setConfirmDelete(false)} style={{ padding:'8px 16px', borderRadius:'6px', border:'1px solid var(--border)', background:'#fff', fontSize:'12px', color:'var(--slate)', cursor:'pointer', fontFamily:'DM Sans, sans-serif' }}>Cancel</button>
+              <button onClick={deleteTeam} style={{ padding:'8px 16px', borderRadius:'6px', border:'none', background:'#991B1B', fontSize:'12px', fontWeight:'600', color:'#fff', cursor:'pointer', fontFamily:'DM Sans, sans-serif' }}>Delete</button>
             </div>
           </div>
         </div>
@@ -123,6 +199,7 @@ function TeamRow({ team, onDeleted }) {
     </div>
   )
 }
+
 
 export default function Settings() {
   const [teams, setTeams] = useState([])
@@ -209,7 +286,7 @@ export default function Settings() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {teams.map(team => (
-                  <TeamRow key={team.id} team={team} onDeleted={loadTeams} />
+                  <TeamRow key={team.id} team={team} onDeleted={loadTeams} onReload={loadTeams}/>
                 ))}
                 <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--slate-light)' }}>
                   {teams.length} {teams.length === 1 ? 'team' : 'teams'} · teams appear on the roadmap once items are assigned to them
