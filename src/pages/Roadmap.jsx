@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { logEvent } from '../lib/audit'
+import { logEvent } from "../lib/audit";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const MONTHS = [
@@ -171,7 +171,7 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
   const dragRef = useRef(null);
   const tm = typeMeta(item.type);
   const cm = confidenceMeta(confidenceLevel(item));
-  const teamColour = item.team_colour || null
+  const teamColour = item.team_colour || null;
 
   const sw = item.start_week ?? quarterStartWeek(item.quarter || "Q1");
   const ew = item.end_week ?? sw + WEEKS_PER_MONTH;
@@ -181,12 +181,12 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
   const ITEM_H = TEAM_H - 10;
   const laneOffsetY = lane * (ITEM_H + 4); // stack with 4px gap
 
-  const didDragRef = useRef(false)
+  const didDragRef = useRef(false);
 
   function startDrag(e, mode) {
     e.stopPropagation();
     e.preventDefault();
-    didDragRef.current = false
+    didDragRef.current = false;
     dragRef.current = {
       mode,
       startX: e.clientX,
@@ -201,7 +201,7 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
 
   function onMove(e) {
     if (!dragRef.current) return;
-    didDragRef.current = true
+    didDragRef.current = true;
     const { mode, startX, origSW, origEW } = dragRef.current;
     const dw = Math.round((e.clientX - startX) / WEEK_W);
     let ns = origSW,
@@ -267,9 +267,12 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
         stroke={teamColour || tm.color}
         strokeWidth={1.5}
         onMouseDown={(e) => startDrag(e, "move")}
-        onClick={() => {if (!didDragRef.current) onClick(item) }}
+        onClick={() => {
+          if (!didDragRef.current) onClick(item);
+        }}
         style={{ cursor: "grab" }}
       />
+      {/* Confidence dot */}
       <circle
         cx={x + w - 10}
         cy={rowY + laneOffsetY + 12}
@@ -277,6 +280,22 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
         fill={cm.color}
         style={{ pointerEvents: "none" }}
       />
+
+      {/* SMT priority flag */}
+      {item.smt_priority && (
+        <text
+          x={x + 8}
+          y={rowY + laneOffsetY + 13}
+          fontSize={9}
+          fontFamily="DM Sans, sans-serif"
+          fontWeight={700}
+          fill={teamColour || tm.color}
+          style={{ pointerEvents: "none" }}
+        >
+          ★
+        </text>
+      )}
+
       <foreignObject
         x={x + 7}
         y={rowY + laneOffsetY + 6}
@@ -926,14 +945,14 @@ function AddOutcomeModal({
 
     //Audit log
     await logEvent({
-      eventType: 'outcome_added',
-      entityType: 'quarterly_outcome',
+      eventType: "outcome_added",
+      entityType: "quarterly_outcome",
       entityId: goalId,
       entityName: text.trim(),
       pillarId,
       teamId: teamId || null,
       newValue: { quarter: goal.quarter, summary: text.trim() },
-    })
+    });
     setSaving(false);
     onSaved();
   }
@@ -1165,7 +1184,7 @@ function OutcomeCell({
   items,
   onReload,
   onOpenMapping,
-  onAddOutcome ,
+  onAddOutcome,
 }) {
   const [editingOutcome, setEditingOutcome] = useState(null);
   const [editingText, setEditingText] = useState("");
@@ -1207,19 +1226,18 @@ function OutcomeCell({
   }
 
   async function deleteOutcome(id) {
-
     //Audit log
-    const outcome = outcomes.find(o => o.id === id)
+    const outcome = outcomes.find((o) => o.id === id);
     if (outcome) {
       await logEvent({
-        eventType: 'outcome_deleted',
-        entityType: 'quarterly_outcome',
+        eventType: "outcome_deleted",
+        entityType: "quarterly_outcome",
         entityId: id,
         entityName: outcome.summary,
         pillarId: outcome.pillar_id || null,
         teamId: outcome.team_id || null,
         oldValue: { quarter: outcome.quarter, summary: outcome.summary },
-      })
+      });
     }
 
     await supabase.from("quarterly_outcomes").delete().eq("id", id);
@@ -1323,22 +1341,22 @@ function OutcomeCell({
         </div>
       ))}
 
-        <button
-          onClick={() => onAddOutcome()}
-          style={{
-            fontSize: "9px",
-            color: "var(--slate-light)",
-            background: "transparent",
-            border: "1px dashed var(--border)",
-            borderRadius: "4px",
-            padding: "2px 6px",
-            cursor: "pointer",
-            fontFamily: "DM Sans, sans-serif",
-            alignSelf: "flex-start",
-          }}
-        >
-          + outcome
-        </button>
+      <button
+        onClick={() => onAddOutcome()}
+        style={{
+          fontSize: "9px",
+          color: "var(--slate-light)",
+          background: "transparent",
+          border: "1px dashed var(--border)",
+          borderRadius: "4px",
+          padding: "2px 6px",
+          cursor: "pointer",
+          fontFamily: "DM Sans, sans-serif",
+          alignSelf: "flex-start",
+        }}
+      >
+        + outcome
+      </button>
     </div>
   );
 }
@@ -1397,6 +1415,7 @@ function ItemDetailPanel({
         jira_ref: form.jira_ref || null,
         doc_url: form.doc_url || null,
         description: form.description || null,
+        smt_priority: form.smt_priority || false,
       })
       .eq("id", item.id);
     setSaving(false);
@@ -1405,11 +1424,10 @@ function ItemDetailPanel({
   }
 
   async function del() {
-
     //Audit log
     await logEvent({
-      eventType: 'item_deleted',
-      entityType: 'roadmap_item',
+      eventType: "item_deleted",
+      entityType: "roadmap_item",
       entityId: item.id,
       entityName: item.title,
       pillarId: item.pillar_id || null,
@@ -1419,7 +1437,7 @@ function ItemDetailPanel({
         quarter: item.quarter,
         status: item.status,
       },
-    })
+    });
 
     await supabase.from("roadmap_items").delete().eq("id", item.id);
     onDeleted();
@@ -1922,6 +1940,43 @@ function ItemDetailPanel({
 
               <div
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "8px 10px",
+                  background: "var(--bg)",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  id="smt_priority"
+                  checked={form.smt_priority || false}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, smt_priority: e.target.checked }))
+                  }
+                  style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                />
+                <label
+                  htmlFor="smt_priority"
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    color: "var(--navy)",
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                >
+                  ★ SMT priority
+                </label>
+                <span style={{ fontSize: "11px", color: "var(--slate-light)" }}>
+                  Flag for SMT snapshot report
+                </span>
+              </div>
+
+              <div
+                style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gap: "10px",
@@ -2314,6 +2369,7 @@ function AddItemModal({
     description: "",
     start_week: quarterStartWeek("Q1"),
     end_week: quarterStartWeek("Q1") + WEEKS_PER_MONTH,
+    smt_priority: false,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -2321,29 +2377,34 @@ function AddItemModal({
   async function save() {
     if (!form.title.trim()) return setError("Title is required");
     setSaving(true);
-    const { data: result, error } = await supabase.from("roadmap_items").insert({
-      title: form.title.trim(),
-      type: form.type,
-      track: "delivery",
-      status: form.status,
-      quarter: form.quarter,
-      financial_year: form.financial_year,
-      team_id: form.team_id || null,
-      pillar_id: form.pillar_id || null,
-      goal_id: form.goal_id || null,
-      hypothesis: form.hypothesis || null,
-      start_week: form.start_week,
-      end_week: form.end_week,
-      description: form.description || null,
-    }).select().single()
+    const { data: result, error } = await supabase
+      .from("roadmap_items")
+      .insert({
+        title: form.title.trim(),
+        type: form.type,
+        track: "delivery",
+        status: form.status,
+        quarter: form.quarter,
+        financial_year: form.financial_year,
+        team_id: form.team_id || null,
+        pillar_id: form.pillar_id || null,
+        goal_id: form.goal_id || null,
+        hypothesis: form.hypothesis || null,
+        start_week: form.start_week,
+        end_week: form.end_week,
+        description: form.description || null,
+        smt_priority: form.smt_priority || false,
+      })
+      .select()
+      .single();
     setSaving(false);
     if (error) return setError(error.message);
 
     //Audit log
     await logEvent({
-      eventType: 'item_created',
-      entityType: 'roadmap_item',
-      entityId: result?.id || 'unknown',
+      eventType: "item_created",
+      entityType: "roadmap_item",
+      entityId: result?.id || "unknown",
       entityName: form.title.trim(),
       pillarId: form.pillar_id || null,
       teamId: form.team_id || null,
@@ -2353,7 +2414,7 @@ function AddItemModal({
         financial_year: form.financial_year,
         duration_weeks: form.end_week - form.start_week,
       },
-    })
+    });
     onSaved();
   }
 
@@ -2664,75 +2725,82 @@ export default function Roadmap() {
   const [mappingOutcome, setMappingOutcome] = useState(null);
   const [addingOutcome, setAddingOutcome] = useState(null); // { pillarId, goalId, goal };
   const [filterPillar, setFilterPillar] = useState("");
-
+  const [filterSMT, setFilterSMT] = useState(false)
 
   async function loadAll() {
     const [ir, pr, gr, tr, or] = await Promise.all([
-      supabase.from('roadmap_items').select('*').order('created_at'),
-      supabase.from('pillars').select('*').order('sort_order'),
-      supabase.from('goals').select('*'),
-      supabase.from('teams').select('*').order('sort_order'),
-      supabase.from('quarterly_outcomes').select('*'),
-    ])
-    const teamsData = tr.data || []
-    setItems((ir.data || []).map(item => ({
-      ...item,
-      team_colour: teamsData.find(t => t.id === item.team_id)?.colour || null
-    })))
-    setPillars(pr.data || [])
-    setGoals(gr.data || [])
-    setTeams(teamsData)
-    setOutcomes(or.data || [])
-    setLoading(false)
+      supabase.from("roadmap_items").select("*").order("created_at"),
+      supabase.from("pillars").select("*").order("sort_order"),
+      supabase.from("goals").select("*"),
+      supabase.from("teams").select("*").order("sort_order"),
+      supabase.from("quarterly_outcomes").select("*"),
+    ]);
+    const teamsData = tr.data || [];
+    setItems(
+      (ir.data || []).map((item) => ({
+        ...item,
+        team_colour:
+          teamsData.find((t) => t.id === item.team_id)?.colour || null,
+      })),
+    );
+    setPillars(pr.data || []);
+    setGoals(gr.data || []);
+    setTeams(teamsData);
+    setOutcomes(or.data || []);
+    setLoading(false);
   }
 
   useEffect(() => {
     loadAll();
   }, []);
 
-  const handleUpdate = useCallback((id, changes, persist) => {
-    const originalItem = items.find(i => i.id === id)
+  const handleUpdate = useCallback(
+    (id, changes, persist) => {
+      const originalItem = items.find((i) => i.id === id);
 
-    setItems(prev => prev.map(i => i.id === id ? { ...i, ...changes } : i))
-    if (persist) {
-      clearTimeout(saveTimer.current[id])
-      saveTimer.current[id] = setTimeout(async () => {
-        await supabase.from('roadmap_items').update(changes).eq('id', id)
-        if (originalItem) {
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, ...changes } : i)),
+      );
+      if (persist) {
+        clearTimeout(saveTimer.current[id]);
+        saveTimer.current[id] = setTimeout(async () => {
+          await supabase.from("roadmap_items").update(changes).eq("id", id);
+          if (originalItem) {
+            const oldSW = originalItem.start_week ?? 0;
+            const oldEW = originalItem.end_week ?? 4;
+            const newSW = changes.start_week ?? oldSW;
+            const newEW = changes.end_week ?? oldEW;
+            const oldDuration = oldEW - oldSW;
+            const newDuration = newEW - newSW;
+            const isResize = newDuration !== oldDuration;
 
-        const oldSW       = originalItem.start_week ?? 0
-        const oldEW       = originalItem.end_week ?? 4
-        const newSW       = changes.start_week ?? oldSW
-        const newEW       = changes.end_week ?? oldEW
-        const oldDuration = oldEW - oldSW
-        const newDuration = newEW - newSW
-        const isResize    = newDuration !== oldDuration
-          
-        //Audit log
-        await logEvent({
-            eventType: isResize ? 'item_resized' : 'item_moved',
-            entityType: 'roadmap_item',
-            entityId: id,
-            entityName: originalItem.title,
-            pillarId: originalItem.pillar_id || null,
-            teamId: originalItem.team_id || null,
-            oldValue: { 
-              quarter: originalItem.quarter, 
-              start_week: oldSW, 
-              end_week: oldEW,
-              duration_weeks: oldDuration
-            },
-            newValue: { 
-              quarter: changes.quarter ?? originalItem.quarter,
-              start_week: newSW,
-              end_week: newEW,
-              duration_weeks: newDuration
-            },
-          })
-        }
-      }, 300)
-    }
-  }, [items])
+            //Audit log
+            await logEvent({
+              eventType: isResize ? "item_resized" : "item_moved",
+              entityType: "roadmap_item",
+              entityId: id,
+              entityName: originalItem.title,
+              pillarId: originalItem.pillar_id || null,
+              teamId: originalItem.team_id || null,
+              oldValue: {
+                quarter: originalItem.quarter,
+                start_week: oldSW,
+                end_week: oldEW,
+                duration_weeks: oldDuration,
+              },
+              newValue: {
+                quarter: changes.quarter ?? originalItem.quarter,
+                start_week: newSW,
+                end_week: newEW,
+                duration_weeks: newDuration,
+              },
+            });
+          }
+        }, 300);
+      }
+    },
+    [items],
+  );
 
   // Build row structure
   const rows = [];
@@ -2796,6 +2864,7 @@ export default function Roadmap() {
           item.financial_year === filterYear &&
           (filterConfidence === "all" ||
             confidenceLevel(item) === filterConfidence),
+          (!filterSMT || item.smt_priority),
       );
       return assignLanes(rowItems);
     }
@@ -2919,6 +2988,20 @@ export default function Roadmap() {
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
+                    <button
+            onClick={() => setFilterSMT(f => !f)}
+            style={{
+              padding: "6px 12px", borderRadius: "6px", fontSize: "12px",
+              border: filterSMT ? "none" : "1px solid var(--border)",
+              background: filterSMT ? "var(--navy)" : "#fff",
+              color: filterSMT ? "#fff" : "var(--slate)",
+              cursor: "pointer", fontFamily: "DM Sans, sans-serif",
+              fontWeight: filterSMT ? "600" : "400",
+              display: "flex", alignItems: "center", gap: "4px"
+            }}
+          >
+            ★ SMT
+          </button>
           <button
             onClick={() => {
               setAddCtx({});
@@ -3551,6 +3634,7 @@ export default function Roadmap() {
                       item.financial_year === filterYear &&
                       (filterConfidence === "all" ||
                         confidenceLevel(item) === filterConfidence),
+                      (!filterSMT || item.smt_priority),
                   );
                   return rowItems.map((item) => (
                     <TimelineItem
@@ -3622,7 +3706,14 @@ export default function Roadmap() {
                             items={items}
                             onReload={loadAll}
                             onOpenMapping={setMappingOutcome}
-                            onAddOutcome={() => setAddingOutcome( { pillarId: row.pillar.id, goalId: row.goal.id, goal: { ...row.goal, quarter: q }, quarter: q })}
+                            onAddOutcome={() =>
+                              setAddingOutcome({
+                                pillarId: row.pillar.id,
+                                goalId: row.goal.id,
+                                goal: { ...row.goal, quarter: q },
+                                quarter: q,
+                              })
+                            }
                           />
                         </div>
                       </foreignObject>
@@ -3672,7 +3763,10 @@ export default function Roadmap() {
           filterTeam={filterTeam}
           teams={teams}
           onClose={() => setAddingOutcome(null)}
-          onSaved={() => { setAddingOutcome(null); loadAll() }}
+          onSaved={() => {
+            setAddingOutcome(null);
+            loadAll();
+          }}
         />
       )}
       {selected && (
