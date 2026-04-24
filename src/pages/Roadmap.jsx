@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
+import { logEvent } from '../lib/audit'
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const MONTHS = [
@@ -921,6 +922,17 @@ function AddOutcomeModal({
       financial_year: year,
       summary: text.trim(),
     });
+
+    //Audit log
+    await logEvent({
+      eventType: 'outcome_added',
+      entityType: 'quarterly_outcome',
+      entityId: goalId,
+      entityName: text.trim(),
+      pillarId,
+      teamId: teamId || null,
+      newValue: { quarter: goal.quarter, summary: text.trim() },
+    })
     setSaving(false);
     onSaved();
   }
@@ -2624,16 +2636,37 @@ export default function Roadmap() {
   }, []);
 
   const handleUpdate = useCallback((id, changes, persist) => {
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...changes } : i)),
-    );
+    setItems(prev => prev.map(i => i.id === id ? { ...i, ...changes } : i))
     if (persist) {
-      clearTimeout(saveTimer.current[id]);
+      clearTimeout(saveTimer.current[id])
       saveTimer.current[id] = setTimeout(async () => {
-        await supabase.from("roadmap_items").update(changes).eq("id", id);
-      }, 300);
+        await supabase.from('roadmap_items').update(changes).eq('id', id)
+        const item = items.find(i => i.id === id)
+        if (item) {
+          await logEvent({
+            eventType: 'item_moved',
+            entityType: 'roadmap_item',
+            entityId: id,
+            entityName: item.title,
+            pillarId: item.pillar_id || null,
+            teamId: item.team_id || null,
+            oldValue: { 
+              quarter: item.quarter, 
+              start_week: item.start_week, 
+              end_week: item.end_week,
+              duration_weeks: (item.end_week ?? 4) - (item.start_week ?? 0)
+            },
+            newValue: { 
+              quarter: changes.quarter ?? item.quarter,
+              start_week: changes.start_week ?? item.start_week,
+              end_week: changes.end_week ?? item.end_week,
+              duration_weeks: (changes.end_week ?? item.end_week ?? 4) - (changes.start_week ?? item.start_week ?? 0)
+            },
+          })
+        }
+      }, 300)
     }
-  }, []);
+  }, [items])
 
   // Build row structure
   const rows = [];

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { logEvent } from '../lib/audit'
 
 const PILLAR_COLOURS = [
   "#1E40AF",
@@ -72,6 +73,27 @@ function KPIFocusCard({ goal, onDelete, onReload }) {
         lead_metric_target: form.lead_metric_target?.trim() || null,
       })
       .eq("id", goal.id);
+
+      //Audit log
+      await logEvent({
+        eventType: 'kpi_updated',
+        entityType: 'goal',
+        entityId: goal.id,
+        entityName: form.kpi_name,
+        oldValue: {
+          kpi_name: goal.kpi_name,
+          kpi_target: goal.kpi_target,
+          driver_statement: goal.driver_statement,
+          lead_metric_name: goal.lead_metric_name,
+        },
+        newValue: {
+          kpi_name: form.kpi_name,
+          kpi_target: form.kpi_target,
+          driver_statement: form.driver_statement,
+          lead_metric_name: form.lead_metric_name,
+        },
+      })
+
     setSaving(false);
     setMode("read");
     onReload();
