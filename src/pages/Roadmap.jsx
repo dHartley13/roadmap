@@ -179,9 +179,12 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
   const ITEM_H = TEAM_H - 10;
   const laneOffsetY = lane * (ITEM_H + 4); // stack with 4px gap
 
+  const didDragRef = useRef(false)
+
   function startDrag(e, mode) {
     e.stopPropagation();
     e.preventDefault();
+    didDragRef.current = false
     dragRef.current = {
       mode,
       startX: e.clientX,
@@ -196,6 +199,7 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
 
   function onMove(e) {
     if (!dragRef.current) return;
+    didDragRef.current = true
     const { mode, startX, origSW, origEW } = dragRef.current;
     const dw = Math.round((e.clientX - startX) / WEEK_W);
     let ns = origSW,
@@ -261,7 +265,7 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
         stroke={tm.color}
         strokeWidth={1.5}
         onMouseDown={(e) => startDrag(e, "move")}
-        onClick={() => onClick(item)}
+        onClick={() => {if (!didDragRef.current) onClick(item) }}
         style={{ cursor: "grab" }}
       />
       <circle
