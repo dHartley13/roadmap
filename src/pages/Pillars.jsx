@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { logEvent } from '../lib/audit'
+import { logEvent } from "../lib/audit";
 
 const PILLAR_COLOURS = [
   "#1E40AF",
@@ -52,51 +52,42 @@ function NarrativeBar({ goal }) {
     </div>
   );
 }
-
-function KPIFocusCard({ goal, onDelete, onReload }) {
-  const [mode, setMode] = useState("read");
+function EditFocusModal({ goal, teams, onClose, onSaved, onDelete }) {
   const [form, setForm] = useState({ ...goal });
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function save() {
     setSaving(true);
     await supabase
       .from("goals")
       .update({
-        kpi_name: form.kpi_name?.trim() || null,
-        kpi_baseline: form.kpi_baseline?.trim() || null,
-        kpi_target: form.kpi_target?.trim() || null,
         driver_statement: form.driver_statement?.trim() || null,
         driver_rationale: form.driver_rationale?.trim() || null,
         lead_metric_name: form.lead_metric_name?.trim() || null,
         lead_metric_baseline: form.lead_metric_baseline?.trim() || null,
         lead_metric_target: form.lead_metric_target?.trim() || null,
+        team_id: form.team_id || null,
       })
       .eq("id", goal.id);
 
-      //Audit log
-      await logEvent({
-        eventType: 'kpi_updated',
-        entityType: 'goal',
-        entityId: goal.id,
-        entityName: form.kpi_name,
-        oldValue: {
-          kpi_name: goal.kpi_name,
-          kpi_target: goal.kpi_target,
-          driver_statement: goal.driver_statement,
-          lead_metric_name: goal.lead_metric_name,
-        },
-        newValue: {
-          kpi_name: form.kpi_name,
-          kpi_target: form.kpi_target,
-          driver_statement: form.driver_statement,
-          lead_metric_name: form.lead_metric_name,
-        },
-      })
+    await logEvent({
+      eventType: "kpi_updated",
+      entityType: "goal",
+      entityId: goal.id,
+      entityName: form.driver_statement,
+      oldValue: {
+        driver_statement: goal.driver_statement,
+        lead_metric_name: goal.lead_metric_name,
+      },
+      newValue: {
+        driver_statement: form.driver_statement,
+        lead_metric_name: form.lead_metric_name,
+      },
+    });
 
     setSaving(false);
-    setMode("read");
-    onReload();
+    onSaved();
   }
 
   const inp = {
@@ -123,168 +114,212 @@ function KPIFocusCard({ goal, onDelete, onReload }) {
   return (
     <div
       style={{
-        background: "var(--white)",
-        border: "1px solid var(--border)",
-        borderRadius: "8px",
-        overflow: "hidden",
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 200,
       }}
     >
-      {/* Header */}
       <div
         style={{
-          padding: "14px 16px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          background: "var(--bg)",
+          background: "#fff",
+          borderRadius: "12px",
+          width: "520px",
+          maxHeight: "90vh",
+          overflow: "auto",
+          padding: "28px",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
         }}
       >
-        <div style={{ flex: 1 }}>
-          <div
-            style={{
-              fontSize: "9px",
-              fontWeight: "600",
-              color: "var(--slate-light)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              marginBottom: "4px",
-            }}
-          >
-            Product Focus
-          </div>
-          {mode === "edit" ? (
-            <input
-              style={inp}
-              value={form.kpi_name || ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, kpi_name: e.target.value }))
-              }
-              placeholder="e.g. CS cost as % of revenue"
-            />
-          ) : (
-            <div
-              style={{
-                fontSize: "14px",
-                fontWeight: "700",
-                color: "var(--navy)",
-              }}
-            >
-              {goal.kpi_name || (
-                <span
-                  style={{
-                    color: "var(--slate-light)",
-                    fontWeight: "400",
-                    fontStyle: "italic",
-                  }}
-                >
-                  No KPI selected
-                </span>
-              )}
-            </div>
-          )}
-          {mode === "edit" ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "8px",
-                marginTop: "8px",
-              }}
-            >
-              <div>
-                <label style={lbl}>Baseline</label>
-                <input
-                  style={inp}
-                  value={form.kpi_baseline || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, kpi_baseline: e.target.value }))
-                  }
-                  placeholder="e.g. 6.2%"
-                />
-              </div>
-              <div>
-                <label style={lbl}>Target</label>
-                <input
-                  style={inp}
-                  value={form.kpi_target || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, kpi_target: e.target.value }))
-                  }
-                  placeholder="e.g. 5.31%"
-                />
-              </div>
-            </div>
-          ) : (
-            goal.kpi_baseline &&
-            goal.kpi_target && (
-              <div style={{ display: "flex", gap: "16px", marginTop: "4px" }}>
-                <span style={{ fontSize: "11px", color: "var(--slate)" }}>
-                  Baseline: <strong>{goal.kpi_baseline}</strong>
-                </span>
-                <span style={{ fontSize: "11px", color: "var(--green)" }}>
-                  Target: <strong>{goal.kpi_target}</strong>
-                </span>
-              </div>
-            )
-          )}
-        </div>
         <div
           style={{
             display: "flex",
-            gap: "6px",
-            flexShrink: 0,
-            marginLeft: "12px",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: "20px",
           }}
         >
-          {mode === "read" ? (
-            <>
-              <button
-                onClick={() => setMode("edit")}
+          <div>
+            <h2
+              className="font-display"
+              style={{
+                fontSize: "18px",
+                color: "var(--navy)",
+                marginBottom: "4px",
+              }}
+            >
+              Edit product focus
+            </h2>
+            <p style={{ fontSize: "12px", color: "var(--slate)" }}>
+              Changes will update the roadmap view immediately.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "6px",
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--slate-light)",
+              cursor: "pointer",
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div>
+            <label style={lbl}>Focus area</label>
+            <input
+              style={inp}
+              placeholder="What will your team focus on to move this metric?"
+              value={form.driver_statement || ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, driver_statement: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label style={lbl}>
+              Why do you believe this will move the KPI?
+            </label>
+            <textarea
+              style={{ ...inp, minHeight: "64px", resize: "vertical" }}
+              placeholder="e.g. Agent handling time is the single largest component of CS cost"
+              value={form.driver_rationale || ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, driver_rationale: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label style={lbl}>Team</label>
+            <select
+              style={{ ...inp, cursor: "pointer" }}
+              value={form.team_id || ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, team_id: e.target.value }))
+              }
+            >
+              <option value="">— No team —</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div
+            style={{ borderTop: "1px solid var(--border)", paddingTop: "14px" }}
+          >
+            <div
+              style={{
+                fontSize: "11px",
+                fontWeight: "700",
+                color: "var(--blue)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                marginBottom: "10px",
+              }}
+            >
+              How will you measure progress?
+            </div>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+            >
+              <div>
+                <label style={lbl}>Success measure</label>
+                <input
+                  style={inp}
+                  placeholder="What will you measure to know it's working?"
+                  value={form.lead_metric_name || ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, lead_metric_name: e.target.value }))
+                  }
+                />
+              </div>
+              <div
                 style={{
-                  fontSize: "11px",
-                  padding: "4px 10px",
-                  borderRadius: "4px",
-                  border: "1px solid var(--border)",
-                  background: "#fff",
-                  color: "var(--slate)",
-                  cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "10px",
                 }}
               >
-                Edit
-              </button>
+                <div>
+                  <label style={lbl}>Baseline</label>
+                  <input
+                    style={inp}
+                    placeholder="e.g. 11 mins"
+                    value={form.lead_metric_baseline || ""}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        lead_metric_baseline: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label style={lbl}>Target</label>
+                  <input
+                    style={inp}
+                    placeholder="e.g. 9 mins"
+                    value={form.lead_metric_target || ""}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        lead_metric_target: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingTop: "8px",
+            }}
+          >
+            <button
+              onClick={() => setConfirmDelete(true)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "6px",
+                border: "1px solid #FEE2E2",
+                background: "#FEE2E2",
+                fontSize: "12px",
+                color: "#991B1B",
+                cursor: "pointer",
+                fontFamily: "DM Sans, sans-serif",
+              }}
+            >
+              🗑 Delete focus
+            </button>
+            <div style={{ display: "flex", gap: "8px" }}>
               <button
-                onClick={onDelete}
+                onClick={onClose}
                 style={{
-                  width: "26px",
-                  height: "26px",
-                  borderRadius: "4px",
+                  padding: "8px 16px",
+                  borderRadius: "6px",
                   border: "1px solid var(--border)",
-                  background: "transparent",
-                  color: "var(--slate-light)",
-                  cursor: "pointer",
+                  background: "#fff",
                   fontSize: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                ✕
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => {
-                  setMode("read");
-                  setForm({ ...goal });
-                }}
-                style={{
-                  fontSize: "11px",
-                  padding: "4px 10px",
-                  borderRadius: "4px",
-                  border: "1px solid var(--border)",
-                  background: "#fff",
                   color: "var(--slate)",
                   cursor: "pointer",
                   fontFamily: "DM Sans, sans-serif",
@@ -296,315 +331,259 @@ function KPIFocusCard({ goal, onDelete, onReload }) {
                 onClick={save}
                 disabled={saving}
                 style={{
-                  fontSize: "11px",
-                  padding: "4px 10px",
-                  borderRadius: "4px",
+                  padding: "8px 16px",
+                  borderRadius: "6px",
                   border: "none",
                   background: "var(--blue)",
+                  fontSize: "12px",
+                  fontWeight: "600",
                   color: "#fff",
                   cursor: saving ? "not-allowed" : "pointer",
                   opacity: saving ? 0.7 : 1,
                   fontFamily: "DM Sans, sans-serif",
-                  fontWeight: "600",
                 }}
               >
                 {saving ? "Saving…" : "Save"}
               </button>
-            </>
-          )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Steps */}
-      <div style={{ borderTop: "1px solid var(--border)" }}>
-        {/* Step 1 — Driver */}
+      {confirmDelete && (
         <div
           style={{
-            padding: "12px 16px",
-            borderBottom: "1px solid var(--border)",
-            display: "flex",
-            gap: "12px",
-            alignItems: "flex-start",
-          }}
-        >
-          <div
-            style={{
-              width: "20px",
-              height: "20px",
-              borderRadius: "50%",
-              flexShrink: 0,
-              background: goal.driver_statement
-                ? "var(--blue)"
-                : "var(--border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "10px",
-              fontWeight: "700",
-              color: "white",
-              marginTop: "1px",
-            }}
-          >
-            1
-          </div>
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                fontSize: "10px",
-                fontWeight: "600",
-                color: "var(--slate)",
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                marginBottom: "4px",
-              }}
-            >
-              Driver
-            </div>
-            {mode === "edit" ? (
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-              >
-                <input
-                  style={inp}
-                  placeholder="What will your team focus on to move this metric?"
-                  value={form.driver_statement || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, driver_statement: e.target.value }))
-                  }
-                />
-                <textarea
-                  style={{ ...inp, minHeight: "56px", resize: "vertical" }}
-                  placeholder="Why do you believe this will move the metric?"
-                  value={form.driver_rationale || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, driver_rationale: e.target.value }))
-                  }
-                />
-              </div>
-            ) : goal.driver_statement ? (
-              <div style={{ fontSize: "13px", color: "var(--navy)" }}>
-                {goal.driver_statement}
-              </div>
-            ) : (
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "var(--slate-light)",
-                  fontStyle: "italic",
-                }}
-              >
-                What will your team focus on to move this metric?
-              </div>
-            )}
-            {mode === "read" && goal.driver_rationale && (
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "var(--slate)",
-                  marginTop: "3px",
-                }}
-              >
-                {goal.driver_rationale}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Discovery framework CTA */}
-        <div
-          style={{
-            margin: "0",
-            padding: "10px 16px",
-            borderBottom: "1px solid var(--border)",
-            background: "#F0F9FF",
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.7)",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                fontSize: "11px",
-                fontWeight: "600",
-                color: "#0369A1",
-                marginBottom: "2px",
-              }}
-            >
-              Not sure what to focus on?
-            </div>
-            <div
-              style={{ fontSize: "11px", color: "#0284C7", lineHeight: "1.5" }}
-            >
-              Build a causal model to decompose your business KPI into
-              actionable focus areas.
-            </div>
-          </div>
-          <span
-            style={{
-              fontSize: "10px",
-              fontWeight: "700",
-              padding: "3px 10px",
-              borderRadius: "99px",
-              background: "var(--border)",
-              color: "var(--slate-light)",
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              flexShrink: 0,
-            }}
-          >
-            Coming soon
-          </span>
-        </div>
-
-        {/* Step 3 — How will you measure progress? */}
-        <div
-          style={{
-            padding: "12px 16px",
-            borderBottom: "1px solid var(--border)",
-            display: "flex",
-            gap: "12px",
-            alignItems: "flex-start",
+            justifyContent: "center",
+            zIndex: 300,
           }}
         >
           <div
             style={{
-              width: "20px",
-              height: "20px",
-              borderRadius: "50%",
-              flexShrink: 0,
-              background: goal.lead_metric_name
-                ? "var(--blue)"
-                : "var(--border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "10px",
-              fontWeight: "700",
-              color: "white",
-              marginTop: "1px",
+              background: "#fff",
+              borderRadius: "12px",
+              width: "360px",
+              padding: "28px",
+              boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
             }}
           >
-            3
-          </div>
-          <div style={{ flex: 1 }}>
-            <div
+            <h3
+              className="font-display"
               style={{
-                fontSize: "10px",
-                fontWeight: "600",
-                color: "var(--slate)",
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                marginBottom: "4px",
+                fontSize: "16px",
+                color: "var(--navy)",
+                marginBottom: "8px",
               }}
             >
-              How will you measure progress?
-            </div>
-            {mode === "edit" ? (
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-              >
-                <input
-                  style={inp}
-                  placeholder="What will you measure to know it's working?"
-                  value={form.lead_metric_name || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, lead_metric_name: e.target.value }))
-                  }
-                />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "8px",
-                  }}
-                >
-                  <div>
-                    <label style={lbl}>Baseline</label>
-                    <input
-                      style={inp}
-                      placeholder="e.g. 11 mins"
-                      value={form.lead_metric_baseline || ""}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          lead_metric_baseline: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label style={lbl}>Target</label>
-                    <input
-                      style={inp}
-                      placeholder="e.g. 9 mins"
-                      value={form.lead_metric_target || ""}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          lead_metric_target: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : goal.lead_metric_name ? (
-              <div>
-                <div style={{ fontSize: "13px", color: "var(--navy)" }}>
-                  {goal.lead_metric_name}
-                </div>
-                <div style={{ display: "flex", gap: "16px", marginTop: "3px" }}>
-                  {goal.lead_metric_baseline && (
-                    <span style={{ fontSize: "11px", color: "var(--slate)" }}>
-                      Baseline: <strong>{goal.lead_metric_baseline}</strong>
-                    </span>
-                  )}
-                  {goal.lead_metric_target && (
-                    <span style={{ fontSize: "11px", color: "var(--green)" }}>
-                      Target: <strong>{goal.lead_metric_target}</strong>
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div
+              Delete this focus?
+            </h3>
+            <p
+              style={{
+                fontSize: "12px",
+                color: "var(--slate)",
+                marginBottom: "20px",
+                lineHeight: "1.5",
+              }}
+            >
+              This will remove{" "}
+              <strong>{goal.driver_statement || "this focus"}</strong>{" "}
+              permanently.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={() => setConfirmDelete(false)}
                 style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "#fff",
                   fontSize: "12px",
-                  color: "var(--slate-light)",
-                  fontStyle: "italic",
+                  color: "var(--slate)",
+                  cursor: "pointer",
+                  fontFamily: "DM Sans, sans-serif",
                 }}
               >
-                What will you measure to know it's working?
-              </div>
-            )}
+                Cancel
+              </button>
+              <button
+                onClick={onDelete}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "#991B1B",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontFamily: "DM Sans, sans-serif",
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Strategy narrative */}
-        <div style={{ padding: "12px 16px" }}>
-          <NarrativeBar goal={mode === "read" ? goal : form} />
-          {!(goal.kpi_name && goal.driver_statement && goal.lead_metric_name) &&
-            mode === "read" && (
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "var(--slate-light)",
-                  fontStyle: "italic",
-                }}
-              >
-                Complete product focus, key drivers and how will you measure
-                progress? to generate your strategy narrative.
-              </div>
-            )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
-function AddKPIFocusModal({ pillarId, pillarKPIs, onClose, onSaved }) {
+function KPIFocusCard({ goal, teams, onDelete, onReload }) {
+  const [editing, setEditing] = useState(false);
+  const team = teams?.find((t) => t.id === goal.team_id);
+
+  return (
+    <>
+      <tr
+        onClick={() => setEditing(true)}
+        style={{ cursor: "pointer" }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "#F8FAFC")}
+        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      >
+        <td
+          style={{
+            padding: "10px 12px",
+            fontSize: "12px",
+            fontWeight: "600",
+            color: "var(--navy)",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          {goal.driver_statement || (
+            <span
+              style={{
+                color: "var(--slate-light)",
+                fontStyle: "italic",
+                fontWeight: "400",
+              }}
+            >
+              No focus defined
+            </span>
+          )}
+          {goal.driver_rationale && (
+            <div
+              style={{
+                fontSize: "10px",
+                color: "var(--slate)",
+                fontWeight: "400",
+                marginTop: "2px",
+                lineHeight: "1.4",
+              }}
+            >
+              {goal.driver_rationale}
+            </div>
+          )}
+        </td>
+        <td
+          style={{
+            padding: "10px 12px",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          {team ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <div
+                style={{
+                  width: "7px",
+                  height: "7px",
+                  borderRadius: "50%",
+                  background: team.colour,
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontSize: "11px", color: "var(--navy)" }}>
+                {team.name}
+              </span>
+            </div>
+          ) : (
+            <span
+              style={{
+                fontSize: "11px",
+                color: "var(--slate-light)",
+                fontStyle: "italic",
+              }}
+            >
+              —
+            </span>
+          )}
+        </td>
+        <td
+          style={{
+            padding: "10px 12px",
+            fontSize: "11px",
+            color: "var(--navy)",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          {goal.lead_metric_name || (
+            <span style={{ color: "var(--slate-light)", fontStyle: "italic" }}>
+              —
+            </span>
+          )}
+        </td>
+        <td
+          style={{
+            padding: "10px 12px",
+            fontSize: "11px",
+            color: "var(--slate)",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          {goal.lead_metric_baseline || "—"}
+        </td>
+        <td
+          style={{
+            padding: "10px 12px",
+            fontSize: "11px",
+            fontWeight: "600",
+            color: "var(--green)",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          {goal.lead_metric_target || "—"}
+        </td>
+        <td
+          style={{
+            padding: "10px 12px",
+            borderBottom: "1px solid var(--border)",
+            textAlign: "right",
+          }}
+        >
+          <span style={{ fontSize: "10px", color: "var(--blue)" }}>Edit ›</span>
+        </td>
+      </tr>
+
+      {editing && (
+        <EditFocusModal
+          goal={goal}
+          teams={teams}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false);
+            onReload();
+          }}
+          onDelete={() => {
+            onDelete();
+            setEditing(false);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function AddKPIFocusModal({ pillarId, pillarKPIs, teams, onClose, onSaved }) {
   const [form, setForm] = useState({
     kpi_name: pillarKPIs.length > 0 ? pillarKPIs[0].metric : "",
     kpi_baseline: pillarKPIs.length > 0 ? pillarKPIs[0].baseline : "",
@@ -630,25 +609,30 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, onClose, onSaved }) {
   async function save() {
     if (!form.kpi_name.trim()) return setError("Please select or enter a KPI");
     setSaving(true);
-    const { data, error } = await supabase.from("goals").insert({
-      pillar_id: pillarId,
-      kpi_name: form.kpi_name.trim(),
-      kpi_baseline: form.kpi_baseline.trim() || null,
-      kpi_target: form.kpi_target.trim() || null,
-      driver_statement: form.driver_statement.trim() || null,
-      driver_rationale: form.driver_rationale.trim() || null,
-      lead_metric_name: form.lead_metric_name.trim() || null,
-      lead_metric_baseline: form.lead_metric_baseline.trim() || null,
-      lead_metric_target: form.lead_metric_target.trim() || null,
-    }).select().single()
+    const { data, error } = await supabase
+      .from("goals")
+      .insert({
+        pillar_id: pillarId,
+        kpi_name: form.kpi_name.trim(),
+        kpi_baseline: form.kpi_baseline.trim() || null,
+        kpi_target: form.kpi_target.trim() || null,
+        driver_statement: form.driver_statement.trim() || null,
+        driver_rationale: form.driver_rationale.trim() || null,
+        lead_metric_name: form.lead_metric_name.trim() || null,
+        lead_metric_baseline: form.lead_metric_baseline.trim() || null,
+        lead_metric_target: form.lead_metric_target.trim() || null,
+        team_id: form.team_id || null,
+      })
+      .select()
+      .single();
     setSaving(false);
     if (error) return setError(error.message);
 
     //Adit log
     await logEvent({
-      eventType: 'kpi_created',
-      entityType: 'goal',
-      entityId: data?.id || 'unknown',
+      eventType: "kpi_created",
+      entityType: "goal",
+      entityId: data?.id || "unknown",
       entityName: form.kpi_name,
       pillarId: pillarId,
       newValue: {
@@ -657,7 +641,7 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, onClose, onSaved }) {
         driver_statement: form.driver_statement,
         lead_metric_name: form.lead_metric_name,
       },
-    })
+    });
 
     onSaved();
   }
@@ -838,6 +822,35 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, onClose, onSaved }) {
                   setForm((f) => ({ ...f, driver_rationale: e.target.value }))
                 }
               />
+            </div>
+            <div>
+              <label style={labelStyle}>
+                Team{" "}
+                <span
+                  style={{
+                    color: "var(--slate-light)",
+                    fontWeight: "400",
+                    textTransform: "none",
+                    letterSpacing: 0,
+                  }}
+                >
+                  (optional)
+                </span>
+              </label>
+              <select
+                style={inputStyle}
+                value={form.team_id || ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, team_id: e.target.value }))
+                }
+              >
+                <option value="">— No team —</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div
               style={{
@@ -1351,40 +1364,53 @@ function AddPillarModal({ onClose, onSaved }) {
     </div>
   );
 }
-
-function PillarRow({ pillar, onReload }) {
-  const [expanded, setExpanded] = useState(true);
-  const [goals, setGoals] = useState([]);
-  const [loadingGoals, setLoadingGoals] = useState(false);
+function PillarRow({ pillar, goals, teams, items, onReload }) {
+  const [expanded, setExpanded] = useState(false);
   const [showAddKPI, setShowAddKPI] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [selectedKPI, setSelectedKPI] = useState(null);
 
-  async function loadGoals() {
-    setLoadingGoals(true);
-    const { data } = await supabase
-      .from("goals")
-      .select("*")
-      .eq("pillar_id", pillar.id)
-      .order("sort_order");
-    setGoals(data || []);
-    setLoadingGoals(false);
-  }
+  const pillarGoals = goals.filter((g) => g.pillar_id === pillar.id);
+  const pillarItems = items.filter((i) => i.pillar_id === pillar.id);
 
-  async function deletePillar() {
-    await supabase.from("pillars").delete().eq("id", pillar.id);
-    setConfirmDelete(false);
-    onReload?.();
-  }
+  // Teams contributing — union of teams with goals or items on this pillar
+  const teamIdsFromGoals = goals
+    .filter((g) => g.pillar_id === pillar.id)
+    .flatMap((g) =>
+      teams
+        .filter(
+          (t) => goals.some((goal) => goal.pillar_id === pillar.id), // has focus
+        )
+        .map((t) => t.id),
+    );
+
+  const teamIdsFromItems = pillarItems
+    .filter((i) => i.team_id)
+    .map((i) => i.team_id);
+
+  const teamIdsFromFocuses = goals
+    .filter((g) => g.pillar_id === pillar.id && g.team_id)
+    .map((g) => g.team_id);
+
+  // All unique team IDs contributing to this pillar
+  const contributingTeamIds = [
+    ...new Set([...teamIdsFromItems, ...teamIdsFromFocuses]),
+  ];
+
+  // Group goals by KPI name
+  const kpiGroups = pillarGoals.reduce((acc, goal) => {
+    const key = goal.kpi_name || "No KPI";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(goal);
+    return acc;
+  }, {});
 
   async function deleteGoal(goalId) {
-
-    //Audit log
-    const goal = goals.find(g => g.id === goalId)
-    console.log('deleteGoal called', goalId, goal, goals) //debug
+    const goal = goals.find((g) => g.id === goalId);
     if (goal) {
       await logEvent({
-        eventType: 'kpi_deleted',
-        entityType: 'goal',
+        eventType: "kpi_deleted",
+        entityType: "goal",
         entityId: goalId,
         entityName: goal.kpi_name,
         pillarId: pillar.id,
@@ -1393,61 +1419,64 @@ function PillarRow({ pillar, onReload }) {
           driver_statement: goal.driver_statement,
           lead_metric_name: goal.lead_metric_name,
         },
-      })
+      });
     }
-
     await supabase.from("goals").delete().eq("id", goalId);
-    loadGoals();
+    onReload();
   }
 
-  useEffect(() => {
-    loadGoals();
-  }, [pillar.id]);
+  async function deletePillar() {
+    await supabase.from("pillars").delete().eq("id", pillar.id);
+    setConfirmDelete(false);
+    onReload();
+  }
+
+  const uniqueKPIs = Object.keys(kpiGroups).length;
+  const totalFocuses = pillarGoals.length;
 
   return (
     <div
       style={{
-        background: "var(--white)",
+        background: "#fff",
         border: "1px solid var(--border)",
         borderRadius: "10px",
         overflow: "hidden",
         borderLeft: `4px solid ${pillar.colour || "#1E40AF"}`,
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          padding: "20px 24px",
-          display: "flex",
-          alignItems: "center",
-          gap: "16px",
-        }}
-      >
+      {/* Pillar header — always visible */}
+      <div style={{ padding: "16px 20px" }}>
+        {/* Top row — name + delete */}
         <div
-          onClick={() => setExpanded((e) => !e)}
           style={{
             display: "flex",
-            alignItems: "center",
-            gap: "16px",
-            flex: 1,
-            cursor: "pointer",
-            userSelect: "none",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "12px",
+            marginBottom: "10px",
           }}
         >
           <div
             style={{
-              width: "10px",
-              height: "10px",
-              borderRadius: "50%",
-              background: pillar.colour || "#1E40AF",
-              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flex: 1,
             }}
-          />
-          <div style={{ flex: 1 }}>
+          >
+            <div
+              style={{
+                width: "10px",
+                height: "10px",
+                borderRadius: "50%",
+                background: pillar.colour || "#1E40AF",
+                flexShrink: 0,
+              }}
+            />
             <h2
               className="font-display"
               style={{
-                fontSize: "16px",
+                fontSize: "15px",
                 color: "var(--navy)",
                 fontWeight: "600",
                 lineHeight: "1.3",
@@ -1455,214 +1484,442 @@ function PillarRow({ pillar, onReload }) {
             >
               {pillar.name}
             </h2>
-            {pillar.description && (
-              <p
-                style={{
-                  fontSize: "12px",
-                  color: "var(--slate)",
-                  marginTop: "3px",
-                }}
-              >
-                {pillar.description}
-              </p>
-            )}
-            {pillar.success_criteria && pillar.success_criteria.length > 0 && (
-              <div
-                style={{
-                  marginTop: "10px",
-                  display: "grid",
-                  gridTemplateColumns: "1fr 100px 100px",
-                  gap: "4px",
-                }}
-              >
-                {["Metric", "Baseline", "Target"].map((h) => (
-                  <div
-                    key={h}
-                    style={{
-                      fontSize: "9px",
-                      fontWeight: "600",
-                      color: "var(--slate-light)",
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                      paddingBottom: "3px",
-                    }}
-                  >
-                    {h}
-                  </div>
-                ))}
-                {pillar.success_criteria.map((row, i) => (
-                  <>
-                    <div
-                      key={`m-${i}`}
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        color: "var(--navy)",
-                        padding: "3px 0",
-                        borderTop: "1px solid var(--border)",
-                      }}
-                    >
-                      {row.metric}
-                    </div>
-                    <div
-                      key={`b-${i}`}
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--slate)",
-                        padding: "3px 0",
-                        borderTop: "1px solid var(--border)",
-                      }}
-                    >
-                      {row.baseline || "—"}
-                    </div>
-                    <div
-                      key={`t-${i}`}
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: "600",
-                        color: "var(--green)",
-                        padding: "3px 0",
-                        borderTop: "1px solid var(--border)",
-                      }}
-                    >
-                      {row.target || "—"}
-                    </div>
-                  </>
-                ))}
-              </div>
-            )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "6px",
+              border: "1px solid #FEE2E2",
+              background: "#FEE2E2",
+              color: "#991B1B",
+              cursor: "pointer",
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            🗑
+          </button>
+        </div>
+
+        {/* Description */}
+        {pillar.description && (
+          <p
+            style={{
+              fontSize: "12px",
+              color: "var(--slate)",
+              marginBottom: "10px",
+              lineHeight: "1.5",
+            }}
+          >
+            {pillar.description}
+          </p>
+        )}
+
+        {/* Stats + expand row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: "10px",
+          }}
+        >
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            {[
+              pillar.success_criteria?.length > 0 &&
+                `${pillar.success_criteria.length} KPI${pillar.success_criteria.length !== 1 ? "s" : ""}`,
+              totalFocuses > 0 &&
+                `${totalFocuses} ${totalFocuses === 1 ? "focus" : "focuses"}`,
+              contributingTeamIds.length > 0 &&
+                `${contributingTeamIds.length} ${contributingTeamIds.length === 1 ? "team" : "teams"}`,
+            ]
+              .filter(Boolean)
+              .map((stat, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontSize: "10px",
+                    color: "var(--slate-light)",
+                    background: "var(--bg)",
+                    padding: "2px 8px",
+                    borderRadius: "99px",
+                    border: "1px solid var(--border)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {stat}
+                </span>
+              ))}
+          </div>
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              padding: 0,
+              fontFamily: "DM Sans, sans-serif",
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: "11px", color: "var(--slate-light)" }}>
+              {expanded ? "Collapse" : "Expand"}
+            </span>
             <span
               style={{
                 fontSize: "11px",
                 color: "var(--slate-light)",
-                background: "var(--bg)",
-                padding: "3px 10px",
-                borderRadius: "99px",
-                border: "1px solid var(--border)",
-              }}
-            >
-              {goals.length} KPI {goals.length === 1 ? "focus" : "focuses"}
-            </span>
-            <span
-              style={{
-                fontSize: "16px",
-                color: "var(--slate-light)",
-                transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+                transform: expanded ? "rotate(180deg)" : "none",
                 transition: "transform 0.2s",
+                display: "inline-block",
               }}
             >
               ▾
             </span>
-          </div>
+          </button>
         </div>
-        <button
-          onClick={() => setConfirmDelete(true)}
-          style={{
-            width: "30px",
-            height: "30px",
-            borderRadius: "6px",
-            border: "1px solid var(--border)",
-            background: "transparent",
-            color: "var(--slate-light)",
-            cursor: "pointer",
-            fontSize: "14px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-          title="Delete pillar"
-        >
-          ✕
-        </button>
       </div>
 
-      {/* Product focuses */}
+      {/* Expanded content */}
       {expanded && (
         <div
           style={{
             borderTop: "1px solid var(--border)",
-            padding: "16px 24px 20px",
             background: "var(--bg)",
           }}
         >
-          {loadingGoals ? (
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--slate-light)",
-                padding: "8px 0",
-              }}
-            >
-              Loading...
-            </p>
-          ) : goals.length === 0 ? (
+          {/* Description + success criteria */}
+          {(pillar.description ||
+            (pillar.success_criteria &&
+              pillar.success_criteria.length > 0)) && (
             <div
               style={{
-                padding: "20px",
-                border: "1px dashed var(--border)",
-                borderRadius: "8px",
-                textAlign: "center",
+                padding: "14px 20px",
+                borderBottom: "1px solid var(--border)",
+                background: "#fff",
               }}
             >
-              <p
-                style={{
-                  fontSize: "12px",
-                  color: "var(--slate-light)",
-                  marginBottom: "12px",
-                }}
-              >
-                No Product focus yet — select a metric to start building your
-                product strategy
-              </p>
-              <button
-                onClick={() => setShowAddKPI(true)}
-                style={{
-                  padding: "7px 16px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--blue)",
-                  background: "transparent",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  color: "var(--blue)",
-                  cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
-                }}
-              >
-                + Add Product focus
-              </button>
-            </div>
-          ) : (
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-            >
-              {goals.map((goal) => (
-                <KPIFocusCard
-                  key={goal.id}
-                  goal={goal}
-                  onDelete={() => deleteGoal(goal.id)}
-                  onReload={loadGoals}
-                />
-              ))}
-              <button
-                onClick={() => setShowAddKPI(true)}
-                style={{
-                  padding: "8px",
-                  borderRadius: "6px",
-                  border: "1px dashed var(--border)",
-                  background: "transparent",
-                  fontSize: "12px",
-                  fontWeight: "500",
-                  color: "var(--slate-light)",
-                  cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
-                  marginTop: "4px",
-                }}
-              >
-                + Add another product focus
-              </button>
+              {pillar.description && (
+                <p
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--slate)",
+                    marginBottom:
+                      pillar.success_criteria?.length > 0 ? "10px" : 0,
+                  }}
+                >
+                  {pillar.description}
+                </p>
+              )}
+              {pillar.success_criteria &&
+                pillar.success_criteria.length > 0 && (
+                  <div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 100px 100px 80px 80px",
+                        gap: "4px",
+                      }}
+                    >
+                      {["Metric", "Baseline", "Target", "Focuses", "Teams"].map(
+                        (h) => (
+                          <div
+                            key={h}
+                            style={{
+                              fontSize: "9px",
+                              fontWeight: "600",
+                              color: "var(--slate-light)",
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                              paddingBottom: "3px",
+                            }}
+                          >
+                            {h}
+                          </div>
+                        ),
+                      )}
+                      {pillar.success_criteria.map((row, i) => {
+                        const focusesForKPI = pillarGoals.filter(
+                          (g) => g.kpi_name === row.metric,
+                        );
+                        const teamsForKPI = [
+                          ...new Set([
+                            ...items
+                              .filter(
+                                (item) =>
+                                  focusesForKPI.some(
+                                    (g) => g.id === item.goal_id,
+                                  ) && item.team_id,
+                              )
+                              .map((i) => i.team_id),
+                            ...focusesForKPI
+                              .filter((g) => g.team_id)
+                              .map((g) => g.team_id),
+                          ]),
+                        ];
+                        const isSelected = selectedKPI === row.metric;
+                        const cellStyle = {
+                          fontSize: "12px",
+                          color: "var(--navy)",
+                          padding: "5px 6px",
+                          borderTop: "1px solid var(--border)",
+                          cursor: "pointer",
+                          background: isSelected
+                            ? "var(--blue-light)"
+                            : "transparent",
+                        };
+                        const toggle = () =>
+                          setSelectedKPI(isSelected ? null : row.metric);
+                        return (
+                          <>
+                            <div
+                              key={`m-${i}`}
+                              onClick={toggle}
+                              style={{
+                                ...cellStyle,
+                                fontWeight: "500",
+                                color: isSelected
+                                  ? "var(--blue)"
+                                  : "var(--navy)",
+                                borderRadius: "4px 0 0 4px",
+                              }}
+                            >
+                              {row.metric}
+                            </div>
+                            <div
+                              key={`b-${i}`}
+                              onClick={toggle}
+                              style={{ ...cellStyle, color: "var(--slate)" }}
+                            >
+                              {row.baseline || "—"}
+                            </div>
+                            <div
+                              key={`t-${i}`}
+                              onClick={toggle}
+                              style={{
+                                ...cellStyle,
+                                fontWeight: "600",
+                                color: isSelected
+                                  ? "var(--blue)"
+                                  : "var(--green)",
+                              }}
+                            >
+                              {row.target || "—"}
+                            </div>
+                            <div
+                              key={`f-${i}`}
+                              onClick={toggle}
+                              style={{
+                                ...cellStyle,
+                                color:
+                                  focusesForKPI.length > 0
+                                    ? "var(--blue)"
+                                    : "var(--slate-light)",
+                                fontWeight:
+                                  focusesForKPI.length > 0 ? "600" : "400",
+                              }}
+                            >
+                              {focusesForKPI.length || "—"}
+                            </div>
+                            <div
+                              key={`tm-${i}`}
+                              onClick={toggle}
+                              style={{
+                                ...cellStyle,
+                                color:
+                                  teamsForKPI.length > 0
+                                    ? "var(--navy)"
+                                    : "var(--slate-light)",
+                                fontWeight:
+                                  teamsForKPI.length > 0 ? "600" : "400",
+                                borderRadius: "0 4px 4px 0",
+                              }}
+                            >
+                              {teamsForKPI.length || "—"}
+                            </div>
+                          </>
+                        );
+                      })}
+                    </div>
+
+                    {/* Selected KPI detail */}
+                    {selectedKPI && (
+                      <div
+                        style={{
+                          marginTop: "16px",
+                          border: "1px solid var(--blue-light)",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            padding: "10px 14px",
+                            background: "var(--navy)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "10px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: "700",
+                                color: "var(--slate-light)",
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              KPI
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "13px",
+                                fontWeight: "700",
+                                color: "#fff",
+                              }}
+                            >
+                              {selectedKPI}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setSelectedKPI(null)}
+                            style={{
+                              width: "22px",
+                              height: "22px",
+                              borderRadius: "4px",
+                              border: "none",
+                              background: "rgba(255,255,255,0.1)",
+                              color: "#fff",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div style={{ background: "var(--bg)" }}>
+                          {kpiGroups[selectedKPI]?.length > 0 ? (
+                            <table
+                              style={{
+                                width: "100%",
+                                borderCollapse: "collapse",
+                              }}
+                            >
+                              <thead>
+                                <tr style={{ background: "var(--bg)" }}>
+                                  {[
+                                    "Focus area",
+                                    "Team",
+                                    "Measuring",
+                                    "Baseline",
+                                    "Target",
+                                    "",
+                                  ].map((h, i) => (
+                                    <th
+                                      key={h}
+                                      style={{
+                                        padding: "8px 12px",
+                                        fontSize: "9px",
+                                        fontWeight: "700",
+                                        color: "var(--slate-light)",
+                                        letterSpacing: "0.08em",
+                                        textTransform: "uppercase",
+                                        textAlign: "left",
+                                        borderBottom: "1px solid var(--border)",
+                                        width: i === 5 ? "60px" : "auto",
+                                      }}
+                                    >
+                                      {h}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {kpiGroups[selectedKPI].map((goal) => (
+                                  <KPIFocusCard
+                                    key={goal.id}
+                                    goal={goal}
+                                    teams={teams}
+                                    onDelete={() => deleteGoal(goal.id)}
+                                    onReload={onReload}
+                                  />
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <p
+                              style={{
+                                padding: "12px 14px",
+                                fontSize: "12px",
+                                color: "var(--slate-light)",
+                                fontStyle: "italic",
+                              }}
+                            >
+                              No product focuses for this KPI yet.
+                            </p>
+                          )}
+                          <div
+                            style={{
+                              padding: "10px 14px",
+                              borderTop: "1px solid var(--border)",
+                            }}
+                          >
+                            <button
+                              onClick={() => setShowAddKPI(true)}
+                              style={{
+                                padding: "6px 14px",
+                                borderRadius: "6px",
+                                border: "1px solid var(--blue)",
+                                background: "transparent",
+                                fontSize: "11px",
+                                fontWeight: "600",
+                                color: "var(--blue)",
+                                cursor: "pointer",
+                                fontFamily: "DM Sans, sans-serif",
+                              }}
+                            >
+                              + Add strategic focus
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {/* Empty state */}
+              {pillarGoals.length === 0 && (
+                <div style={{ marginTop: "12px", textAlign: "center" }}>
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--slate-light)",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    No strategic focus yet — select a KPI above to add one
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1672,10 +1929,9 @@ function PillarRow({ pillar, onReload }) {
         <AddKPIFocusModal
           pillarId={pillar.id}
           pillarKPIs={pillar.success_criteria || []}
+          teams={teams}
           onClose={() => setShowAddKPI(false)}
-          onSaved={() => {
-            setShowAddKPI(false);
-            loadGoals();
+          onSaved={() => { setShowAddKPI(false); onReload();
           }}
         />
       )}
@@ -1694,7 +1950,7 @@ function PillarRow({ pillar, onReload }) {
         >
           <div
             style={{
-              background: "var(--white)",
+              background: "#fff",
               borderRadius: "12px",
               width: "400px",
               padding: "32px",
@@ -1731,8 +1987,8 @@ function PillarRow({ pillar, onReload }) {
                 marginBottom: "24px",
               }}
             >
-              This will also delete all product focuses and roadmap items within
-              this pillar. This cannot be undone.
+              This will also delete all strategic focuses and roadmap items
+              within this pillar. This cannot be undone.
             </p>
             <div
               style={{
@@ -1747,7 +2003,7 @@ function PillarRow({ pillar, onReload }) {
                   padding: "9px 18px",
                   borderRadius: "6px",
                   border: "1px solid var(--border)",
-                  background: "var(--white)",
+                  background: "#fff",
                   fontSize: "13px",
                   fontWeight: "500",
                   color: "var(--slate)",
@@ -1766,7 +2022,7 @@ function PillarRow({ pillar, onReload }) {
                   background: "var(--red)",
                   fontSize: "13px",
                   fontWeight: "600",
-                  color: "var(--white)",
+                  color: "#fff",
                   cursor: "pointer",
                   fontFamily: "DM Sans, sans-serif",
                 }}
@@ -1785,13 +2041,21 @@ export default function Pillars() {
   const [pillars, setPillars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddPillar, setShowAddPillar] = useState(false);
+  const [teams, setTeams] = useState([]);
+  const [items, setItems] = useState([]);
+  const [goals, setGoals] = useState([]);
 
   async function loadPillars() {
-    const { data } = await supabase
-      .from("pillars")
-      .select("*")
-      .order("sort_order");
-    setPillars(data || []);
+    const [pr, gr, tr, ir] = await Promise.all([
+      supabase.from("pillars").select("*").order("sort_order"),
+      supabase.from("goals").select("*"),
+      supabase.from("teams").select("*"),
+      supabase.from("roadmap_items").select("id, pillar_id, goal_id, team_id"),
+    ]);
+    setPillars(pr.data || []);
+    setGoals(gr.data || []);
+    setTeams(tr.data || []);
+    setItems(ir.data || []);
     setLoading(false);
   }
 
@@ -1800,7 +2064,7 @@ export default function Pillars() {
   }, []);
 
   return (
-    <div style={{ maxWidth: "860px" }}>
+    <div style={{ maxWidth: "1200px" }}>
       <div
         style={{
           marginBottom: "32px",
@@ -1831,24 +2095,32 @@ export default function Pillars() {
             state the driver you believe will move it.
           </p>
         </div>
-        <button
-          onClick={() => setShowAddPillar(true)}
+        <div
           style={{
-            padding: "10px 20px",
-            borderRadius: "8px",
-            border: "none",
-            background: "var(--navy)",
-            fontSize: "13px",
-            fontWeight: "600",
-            color: "var(--white)",
-            cursor: "pointer",
-            fontFamily: "DM Sans, sans-serif",
-            flexShrink: 0,
+            display: "flex",
+            gap: "8px",
+            alignItems: "center",
             marginLeft: "24px",
+            flexShrink: 0,
           }}
         >
-          + New pillar
-        </button>
+          <button
+            onClick={() => setShowAddPillar(true)}
+            style={{
+              padding: "10px 20px",
+              borderRadius: "8px",
+              border: "none",
+              background: "var(--navy)",
+              fontSize: "13px",
+              fontWeight: "600",
+              color: "#fff",
+              cursor: "pointer",
+              fontFamily: "DM Sans, sans-serif",
+            }}
+          >
+            + New pillar
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -1906,7 +2178,14 @@ export default function Pillars() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {pillars.map((pillar) => (
-            <PillarRow key={pillar.id} pillar={pillar} onReload={loadPillars} />
+            <PillarRow
+              key={pillar.id}
+              pillar={pillar}
+              goals={goals}
+              teams={teams}
+              items={items}
+              onReload={loadPillars}
+            />
           ))}
         </div>
       )}
