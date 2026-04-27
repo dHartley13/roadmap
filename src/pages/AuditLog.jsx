@@ -2,16 +2,30 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 const EVENT_META = {
-  item_moved:     { label: 'Feature moved',    color: '#1E40AF', bg: '#DBEAFE' },
-  item_resized:   { label: 'Feature resized',  color: '#92400E', bg: '#FEF3C7' },
-  item_updated:   { label: 'Feature updated',  color: '#0F766E', bg: '#CCFBF1' },
-  item_created:   { label: 'Feature added',    color: '#166534', bg: '#DCFCE7' },
-  item_deleted:   { label: 'Feature deleted',  color: '#991B1B', bg: '#FEE2E2' },
-  outcome_added:  { label: 'Outcome added',    color: '#7C3AED', bg: '#EDE9FE' },
-  outcome_deleted:{ label: 'Outcome deleted',  color: '#BE185D', bg: '#FCE7F3' },
-  kpi_updated:    { label: 'KPI updated',      color: '#B45309', bg: '#FEF3C7' },
-  kpi_deleted:    { label: 'KPI deleted',      color: '#991B1B', bg: '#FEE2E2' },
-  kpi_created:    { label: 'KPI created',      color: '#166534', bg: '#DCFCE7' },
+  item_moved: { label: "Feature moved", color: "#1E40AF", bg: "#DBEAFE" },
+  item_resized: { label: "Feature resized", color: "#92400E", bg: "#FEF3C7" },
+  item_updated: { label: "Feature updated", color: "#0F766E", bg: "#CCFBF1" },
+  item_created: { label: "Feature added", color: "#166534", bg: "#DCFCE7" },
+  item_deleted: { label: "Feature deleted", color: "#991B1B", bg: "#FEE2E2" },
+  outcome_added: { label: "Outcome added", color: "#7C3AED", bg: "#EDE9FE" },
+  outcome_deleted: {
+    label: "Outcome deleted",
+    color: "#BE185D",
+    bg: "#FCE7F3",
+  },
+  kpi_updated: { label: "KPI updated", color: "#B45309", bg: "#FEF3C7" },
+  kpi_deleted: { label: "KPI deleted", color: "#991B1B", bg: "#FEE2E2" },
+  kpi_created: { label: "KPI created", color: "#166534", bg: "#DCFCE7" },
+  dependency_created: {
+    label: "Dependency added",
+    color: "#ffffff",
+    bg: "#0F172A",
+  },
+  dependency_removed: {
+    label: "Dependency removed",
+    color: "#ffffff",
+    bg: "#0F172A",
+  },
 };
 
 const MONTHS = [
@@ -95,6 +109,42 @@ function ChangeSummary({ eventType, oldValue, newValue }) {
       const direction =
         diff > 0 ? `Extended by ${diff}` : `Shortened by ${Math.abs(diff)}`;
       lines.push(`${direction} week${Math.abs(diff) !== 1 ? "s" : ""}`);
+    }
+
+    if (eventType === "dependency_created") {
+      return (
+        <div
+          style={{
+            fontSize: "11px",
+            color: "var(--slate)",
+            marginTop: "4px",
+            lineHeight: "1.6",
+          }}
+        >
+          <div>
+            <strong>{newValue?.from}</strong> depends on{" "}
+            <strong>{newValue?.to}</strong>
+          </div>
+        </div>
+      );
+    }
+
+    if (eventType === "dependency_removed") {
+      return (
+        <div
+          style={{
+            fontSize: "11px",
+            color: "var(--slate)",
+            marginTop: "4px",
+            lineHeight: "1.6",
+          }}
+        >
+          <div>
+            Removed: <strong>{oldValue?.from}</strong> →{" "}
+            <strong>{oldValue?.to}</strong>
+          </div>
+        </div>
+      );
     }
 
     if (

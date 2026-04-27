@@ -1434,12 +1434,43 @@ function ItemDetailPanel({
       from_item_id: item.id,
       to_item_id: targetId,
     });
+
+    const targetItem = allItems.find((i) => i.id === targetId);
+    await logEvent({
+      eventType: "dependency_created",
+      entityType: "dependency",
+      entityId: item.id,
+      entityName: form.title,
+      pillarId: item.pillar_id || null,
+      teamId: item.team_id || null,
+      newValue: {
+        from: form.title,
+        to: targetItem?.title || "Unknown",
+      },
+    });
+
     setDepSearch("");
     setSearchResults([]);
     loadDeps();
   }
 
   async function removeDep(depId) {
+    const dep = deps.find((d) => d.id === depId);
+    const other = dep?.from_item_id === item.id ? dep?.to : dep?.from;
+
+    await logEvent({
+      eventType: "dependency_removed",
+      entityType: "dependency",
+      entityId: item.id,
+      entityName: form.title,
+      pillarId: item.pillar_id || null,
+      teamId: item.team_id || null,
+      oldValue: {
+        from: form.title,
+        to: other?.title || "Unknown",
+      },
+    });
+
     await supabase.from("dependencies").delete().eq("id", depId);
     loadDeps();
   }
@@ -1902,291 +1933,124 @@ function ItemDetailPanel({
               >
                 <div
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "8px",
+                    fontSize: "10px",
+                    fontWeight: "700",
+                    color: "var(--blue)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    marginBottom: "6px",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      fontWeight: "700",
-                      color: "var(--blue)",
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Dependencies
-                  </div>
-                  {deps.length > 0 && (
-                    <span
-                      style={{ fontSize: "10px", color: "var(--slate-light)" }}
-                    >
-                      {deps.length} linked
-                    </span>
-                  )}
+                  Dependencies
                 </div>
-
                 {loadingDeps ? (
                   <p style={{ fontSize: "11px", color: "var(--slate-light)" }}>
                     Loading...
                   </p>
+                ) : deps.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "10px 14px",
+                      border: "1px dashed var(--border)",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--slate-light)",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      No dependencies registered — add them in edit mode.
+                    </span>
+                  </div>
                 ) : (
-                  <>
-                    {deps.length > 0 && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "6px",
-                          marginBottom: "10px",
-                        }}
-                      >
-                        {deps.map((dep) => {
-                          const other =
-                            dep.from_item_id === item.id ? dep.to : dep.from;
-                          const isBlocking = dep.from_item_id === item.id;
-                          const otherTeam = teams.find(
-                            (t) => t.id === other?.team_id,
-                          );
-                          return (
-                            <div
-                              key={dep.id}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                padding: "8px 10px",
-                                background: "var(--bg)",
-                                border: "1px solid var(--border)",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: "9px",
-                                  fontWeight: "700",
-                                  padding: "2px 6px",
-                                  borderRadius: "3px",
-                                  flexShrink: 0,
-                                  background: isBlocking
-                                    ? "#FEF3C7"
-                                    : "#DBEAFE",
-                                  color: isBlocking ? "#92400E" : "#1E40AF",
-                                }}
-                              >
-                                {isBlocking ? "BLOCKS" : "NEEDS"}
-                              </span>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: "600",
-                                    color: "var(--navy)",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {other?.title || "Unknown"}
-                                </div>
-                                {otherTeam && (
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "4px",
-                                      marginTop: "2px",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: "6px",
-                                        height: "6px",
-                                        borderRadius: "50%",
-                                        background: otherTeam.colour,
-                                      }}
-                                    />
-                                    <span
-                                      style={{
-                                        fontSize: "10px",
-                                        color: "var(--slate-light)",
-                                      }}
-                                    >
-                                      {otherTeam.name}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => removeDep(dep.id)}
-                                style={{
-                                  border: "none",
-                                  background: "transparent",
-                                  color: "var(--slate-light)",
-                                  cursor: "pointer",
-                                  fontSize: "12px",
-                                  flexShrink: 0,
-                                  padding: 0,
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Search to add */}
-                    <div style={{ position: "relative" }}>
-                      <input
-                        placeholder="Search features to link..."
-                        value={depSearch}
-                        onChange={(e) => setDepSearch(e.target.value)}
-                        style={{
-                          width: "100%",
-                          padding: "7px 10px",
-                          border: "1px solid var(--border)",
-                          borderRadius: "6px",
-                          fontSize: "12px",
-                          fontFamily: "DM Sans, sans-serif",
-                          color: "var(--navy)",
-                          background: "#fff",
-                          outline: "none",
-                        }}
-                      />
-                      {searchResults.length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "6px",
+                    }}
+                  >
+                    {deps.map((dep) => {
+                      const other =
+                        dep.from_item_id === item.id ? dep.to : dep.from;
+                      const isBlocking = dep.from_item_id === item.id;
+                      const otherTeam = teams.find(
+                        (t) => t.id === other?.team_id,
+                      );
+                      return (
                         <div
+                          key={dep.id}
                           style={{
-                            position: "absolute",
-                            top: "100%",
-                            left: 0,
-                            right: 0,
-                            background: "#fff",
+                            padding: "10px 14px",
+                            background: "var(--bg)",
                             border: "1px solid var(--border)",
                             borderRadius: "6px",
-                            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                            zIndex: 10,
-                            marginTop: "4px",
-                            overflow: "hidden",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
                           }}
                         >
-                          {searchResults.map((result) => {
-                            const resultTeam = teams.find(
-                              (t) => t.id === result.team_id,
-                            );
-                            const alreadyLinked = deps.some(
-                              (d) =>
-                                d.from_item_id === result.id ||
-                                d.to_item_id === result.id,
-                            );
-                            return (
+                          <span
+                            style={{
+                              fontSize: "9px",
+                              fontWeight: "700",
+                              padding: "2px 6px",
+                              borderRadius: "3px",
+                              flexShrink: 0,
+                              background: isBlocking ? "#FEF3C7" : "#DBEAFE",
+                              color: isBlocking ? "#92400E" : "#1E40AF",
+                            }}
+                          >
+                            {isBlocking ? "BLOCKS" : "NEEDS"}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: "600",
+                                color: "var(--navy)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {other?.title || "Unknown"}
+                            </div>
+                            {otherTeam && (
                               <div
-                                key={result.id}
-                                onClick={() =>
-                                  !alreadyLinked && addDep(result.id)
-                                }
                                 style={{
-                                  padding: "8px 12px",
-                                  cursor: alreadyLinked ? "default" : "pointer",
-                                  opacity: alreadyLinked ? 0.4 : 1,
-                                  borderBottom: "1px solid var(--border)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  marginTop: "2px",
                                 }}
-                                onMouseEnter={(e) => {
-                                  if (!alreadyLinked)
-                                    e.currentTarget.style.background =
-                                      "var(--bg)";
-                                }}
-                                onMouseLeave={(e) =>
-                                  (e.currentTarget.style.background = "#fff")
-                                }
                               >
                                 <div
                                   style={{
-                                    fontSize: "12px",
-                                    fontWeight: "600",
-                                    color: "var(--navy)",
+                                    width: "6px",
+                                    height: "6px",
+                                    borderRadius: "50%",
+                                    background: otherTeam.colour,
                                   }}
-                                >
-                                  {result.title}
-                                </div>
-                                <div
+                                />
+                                <span
                                   style={{
-                                    display: "flex",
-                                    gap: "8px",
-                                    marginTop: "2px",
+                                    fontSize: "10px",
+                                    color: "var(--slate-light)",
                                   }}
                                 >
-                                  {resultTeam && (
-                                    <div
-                                      style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "3px",
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: "5px",
-                                          height: "5px",
-                                          borderRadius: "50%",
-                                          background: resultTeam.colour,
-                                        }}
-                                      />
-                                      <span
-                                        style={{
-                                          fontSize: "10px",
-                                          color: "var(--slate-light)",
-                                        }}
-                                      >
-                                        {resultTeam.name}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {result.quarter && (
-                                    <span
-                                      style={{
-                                        fontSize: "10px",
-                                        color: "var(--slate-light)",
-                                      }}
-                                    >
-                                      {result.quarter}
-                                    </span>
-                                  )}
-                                  {alreadyLinked && (
-                                    <span
-                                      style={{
-                                        fontSize: "10px",
-                                        color: "var(--slate-light)",
-                                      }}
-                                    >
-                                      Already linked
-                                    </span>
-                                  )}
-                                </div>
+                                  {otherTeam.name}
+                                </span>
                               </div>
-                            );
-                          })}
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-
-                    {deps.length === 0 && !depSearch && (
-                      <p
-                        style={{
-                          fontSize: "11px",
-                          color: "var(--slate-light)",
-                          fontStyle: "italic",
-                          marginTop: "4px",
-                        }}
-                      >
-                        No dependencies registered — search above to link
-                        features.
-                      </p>
-                    )}
-                  </>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
 
@@ -2547,6 +2411,309 @@ function ItemDetailPanel({
                       placeholder="https://..."
                     />
                   </div>
+                </div>
+                {/* Dependencies */}
+                <div
+                  style={{
+                    borderTop: "1px solid var(--border)",
+                    paddingTop: "12px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        fontWeight: "700",
+                        color: "var(--blue)",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Dependencies
+                    </div>
+                    {deps.length > 0 && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          color: "var(--slate-light)",
+                        }}
+                      >
+                        {deps.length} linked
+                      </span>
+                    )}
+                  </div>
+
+                  {loadingDeps ? (
+                    <p
+                      style={{ fontSize: "11px", color: "var(--slate-light)" }}
+                    >
+                      Loading...
+                    </p>
+                  ) : (
+                    <>
+                      {deps.length > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                            marginBottom: "10px",
+                          }}
+                        >
+                          {deps.map((dep) => {
+                            const other =
+                              dep.from_item_id === item.id ? dep.to : dep.from;
+                            const isBlocking = dep.from_item_id === item.id;
+                            const otherTeam = teams.find(
+                              (t) => t.id === other?.team_id,
+                            );
+                            return (
+                              <div
+                                key={dep.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  padding: "8px 10px",
+                                  background: "var(--bg)",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: "6px",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "9px",
+                                    fontWeight: "700",
+                                    padding: "2px 6px",
+                                    borderRadius: "3px",
+                                    flexShrink: 0,
+                                    background: isBlocking
+                                      ? "#FEF3C7"
+                                      : "#DBEAFE",
+                                    color: isBlocking ? "#92400E" : "#1E40AF",
+                                  }}
+                                >
+                                  {isBlocking ? "BLOCKS" : "NEEDS"}
+                                </span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: "600",
+                                      color: "var(--navy)",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {other?.title || "Unknown"}
+                                  </div>
+                                  {otherTeam && (
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        marginTop: "2px",
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: "6px",
+                                          height: "6px",
+                                          borderRadius: "50%",
+                                          background: otherTeam.colour,
+                                        }}
+                                      />
+                                      <span
+                                        style={{
+                                          fontSize: "10px",
+                                          color: "var(--slate-light)",
+                                        }}
+                                      >
+                                        {otherTeam.name}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => removeDep(dep.id)}
+                                  style={{
+                                    border: "none",
+                                    background: "transparent",
+                                    color: "var(--slate-light)",
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                    flexShrink: 0,
+                                    padding: 0,
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Search to add */}
+                      <div style={{ position: "relative" }}>
+                        <input
+                          placeholder="Search features to link..."
+                          value={depSearch}
+                          onChange={(e) => setDepSearch(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "7px 10px",
+                            border: "1px solid var(--border)",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontFamily: "DM Sans, sans-serif",
+                            color: "var(--navy)",
+                            background: "#fff",
+                            outline: "none",
+                          }}
+                        />
+                        {searchResults.length > 0 && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: "100%",
+                              left: 0,
+                              right: 0,
+                              background: "#fff",
+                              border: "1px solid var(--border)",
+                              borderRadius: "6px",
+                              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                              zIndex: 10,
+                              marginTop: "4px",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {searchResults.map((result) => {
+                              const resultTeam = teams.find(
+                                (t) => t.id === result.team_id,
+                              );
+                              const alreadyLinked = deps.some(
+                                (d) =>
+                                  d.from_item_id === result.id ||
+                                  d.to_item_id === result.id,
+                              );
+                              return (
+                                <div
+                                  key={result.id}
+                                  onClick={() =>
+                                    !alreadyLinked && addDep(result.id)
+                                  }
+                                  style={{
+                                    padding: "8px 12px",
+                                    cursor: alreadyLinked
+                                      ? "default"
+                                      : "pointer",
+                                    opacity: alreadyLinked ? 0.4 : 1,
+                                    borderBottom: "1px solid var(--border)",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!alreadyLinked)
+                                      e.currentTarget.style.background =
+                                        "var(--bg)";
+                                  }}
+                                  onMouseLeave={(e) =>
+                                    (e.currentTarget.style.background = "#fff")
+                                  }
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: "600",
+                                      color: "var(--navy)",
+                                    }}
+                                  >
+                                    {result.title}
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: "8px",
+                                      marginTop: "2px",
+                                    }}
+                                  >
+                                    {resultTeam && (
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: "3px",
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            width: "5px",
+                                            height: "5px",
+                                            borderRadius: "50%",
+                                            background: resultTeam.colour,
+                                          }}
+                                        />
+                                        <span
+                                          style={{
+                                            fontSize: "10px",
+                                            color: "var(--slate-light)",
+                                          }}
+                                        >
+                                          {resultTeam.name}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {result.quarter && (
+                                      <span
+                                        style={{
+                                          fontSize: "10px",
+                                          color: "var(--slate-light)",
+                                        }}
+                                      >
+                                        {result.quarter}
+                                      </span>
+                                    )}
+                                    {alreadyLinked && (
+                                      <span
+                                        style={{
+                                          fontSize: "10px",
+                                          color: "var(--slate-light)",
+                                        }}
+                                      >
+                                        Already linked
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {deps.length === 0 && !depSearch && (
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--slate-light)",
+                            fontStyle: "italic",
+                            marginTop: "4px",
+                          }}
+                        >
+                          No dependencies registered — search above to link
+                          features.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </>
@@ -3127,7 +3294,7 @@ export default function Roadmap() {
         team_colour:
           teamsData.find((t) => t.id === item.team_id)?.colour || null,
         dep_count: depsData.filter(
-          (d) => d.from_item_id === item.id || d.to_item.id === item.id,
+          (d) => d && (d.from_item_id === item.id || d.to_item_id === item.id),
         ).length,
       })),
     );
