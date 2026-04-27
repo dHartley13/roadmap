@@ -281,6 +281,32 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
         style={{ pointerEvents: "none" }}
       />
 
+      {item.dep_count > 0 && (
+        <>
+          <rect
+            x={x + 10}
+            y={rowY + laneOffsetY + 5}
+            width={16}
+            height={14}
+            rx={3}
+            fill="#0F172A"
+            style={{ pointerEvents: "none" }}
+          />
+          <text
+            x={x + 18}
+            y={rowY + laneOffsetY + 15}
+            textAnchor="middle"
+            fontSize={8}
+            fontWeight={700}
+            fontFamily="DM Sans, sans-serif"
+            fill="white"
+            style={{ pointerEvents: "none" }}
+          >
+            {item.dep_count}
+          </text>
+        </>
+      )}
+
       {/* SMT priority flag */}
       {item.smt_priority && (
         <text
@@ -1378,7 +1404,66 @@ function ItemDetailPanel({
   const [itemLinks, setItemLinks] = useState([]);
   const [loadingLinks, setLoading] = useState(true);
   const filteredGoals = goals.filter((g) => g.pillar_id === form.pillar_id);
+  const [deps, setDeps] = useState([]);
+  const [loadingDeps, setLoadingDeps] = useState(true);
+  const [depSearch, setDepSearch] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [allItems, setAllItems] = useState([]);
 
+  //dependencies --------------
+  async function loadDeps() {
+    const [depsRes, itemsRes] = await Promise.all([
+      supabase
+        .from("dependencies")
+        .select(
+          "*, from:from_item_id(id, title, team_id), to:to_item_id(id, title, team_id)",
+        )
+        .or(`from_item_id.eq.${item.id},to_item_id.eq.${item.id}`),
+      supabase
+        .from("roadmap_items")
+        .select("id, title, team_id, quarter, pillar_id")
+        .neq("id", item.id),
+    ]);
+    setDeps(depsRes.data || []);
+    setAllItems(itemsRes.data || []);
+    setLoadingDeps(false);
+  }
+
+  async function addDep(targetId) {
+    await supabase.from("dependencies").insert({
+      from_item_id: item.id,
+      to_item_id: targetId,
+    });
+    setDepSearch("");
+    setSearchResults([]);
+    loadDeps();
+  }
+
+  async function removeDep(depId) {
+    await supabase.from("dependencies").delete().eq("id", depId);
+    loadDeps();
+  }
+
+  useEffect(() => {
+    loadDeps();
+  }, [item.id]);
+
+  function fuzzySearch(query, items) {
+    if (!query.trim()) return [];
+    const words = query.toLowerCase().split(" ").filter(Boolean);
+    return items
+      .filter((item) => {
+        const title = item.title.toLowerCase();
+        return words.every((word) => title.includes(word));
+      })
+      .slice(0, 8);
+  }
+
+  useEffect(() => {
+    setSearchResults(fuzzySearch(depSearch, allItems));
+  }, [depSearch, allItems]);
+
+  //Item links ----------
   async function loadItemLinks() {
     const { data } = await supabase
       .from("outcome_items")
@@ -1805,6 +1890,303 @@ function ItemDetailPanel({
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+
+              {/* Dependencies */}
+              <div
+                style={{
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: "700",
+                      color: "var(--blue)",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Dependencies
+                  </div>
+                  {deps.length > 0 && (
+                    <span
+                      style={{ fontSize: "10px", color: "var(--slate-light)" }}
+                    >
+                      {deps.length} linked
+                    </span>
+                  )}
+                </div>
+
+                {loadingDeps ? (
+                  <p style={{ fontSize: "11px", color: "var(--slate-light)" }}>
+                    Loading...
+                  </p>
+                ) : (
+                  <>
+                    {deps.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        {deps.map((dep) => {
+                          const other =
+                            dep.from_item_id === item.id ? dep.to : dep.from;
+                          const isBlocking = dep.from_item_id === item.id;
+                          const otherTeam = teams.find(
+                            (t) => t.id === other?.team_id,
+                          );
+                          return (
+                            <div
+                              key={dep.id}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                padding: "8px 10px",
+                                background: "var(--bg)",
+                                border: "1px solid var(--border)",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "9px",
+                                  fontWeight: "700",
+                                  padding: "2px 6px",
+                                  borderRadius: "3px",
+                                  flexShrink: 0,
+                                  background: isBlocking
+                                    ? "#FEF3C7"
+                                    : "#DBEAFE",
+                                  color: isBlocking ? "#92400E" : "#1E40AF",
+                                }}
+                              >
+                                {isBlocking ? "BLOCKS" : "NEEDS"}
+                              </span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    fontWeight: "600",
+                                    color: "var(--navy)",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {other?.title || "Unknown"}
+                                </div>
+                                {otherTeam && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                      marginTop: "2px",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: "6px",
+                                        height: "6px",
+                                        borderRadius: "50%",
+                                        background: otherTeam.colour,
+                                      }}
+                                    />
+                                    <span
+                                      style={{
+                                        fontSize: "10px",
+                                        color: "var(--slate-light)",
+                                      }}
+                                    >
+                                      {otherTeam.name}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => removeDep(dep.id)}
+                                style={{
+                                  border: "none",
+                                  background: "transparent",
+                                  color: "var(--slate-light)",
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                  flexShrink: 0,
+                                  padding: 0,
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Search to add */}
+                    <div style={{ position: "relative" }}>
+                      <input
+                        placeholder="Search features to link..."
+                        value={depSearch}
+                        onChange={(e) => setDepSearch(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "7px 10px",
+                          border: "1px solid var(--border)",
+                          borderRadius: "6px",
+                          fontSize: "12px",
+                          fontFamily: "DM Sans, sans-serif",
+                          color: "var(--navy)",
+                          background: "#fff",
+                          outline: "none",
+                        }}
+                      />
+                      {searchResults.length > 0 && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            background: "#fff",
+                            border: "1px solid var(--border)",
+                            borderRadius: "6px",
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                            zIndex: 10,
+                            marginTop: "4px",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {searchResults.map((result) => {
+                            const resultTeam = teams.find(
+                              (t) => t.id === result.team_id,
+                            );
+                            const alreadyLinked = deps.some(
+                              (d) =>
+                                d.from_item_id === result.id ||
+                                d.to_item_id === result.id,
+                            );
+                            return (
+                              <div
+                                key={result.id}
+                                onClick={() =>
+                                  !alreadyLinked && addDep(result.id)
+                                }
+                                style={{
+                                  padding: "8px 12px",
+                                  cursor: alreadyLinked ? "default" : "pointer",
+                                  opacity: alreadyLinked ? 0.4 : 1,
+                                  borderBottom: "1px solid var(--border)",
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!alreadyLinked)
+                                    e.currentTarget.style.background =
+                                      "var(--bg)";
+                                }}
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.background = "#fff")
+                                }
+                              >
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    fontWeight: "600",
+                                    color: "var(--navy)",
+                                  }}
+                                >
+                                  {result.title}
+                                </div>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: "8px",
+                                    marginTop: "2px",
+                                  }}
+                                >
+                                  {resultTeam && (
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "3px",
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: "5px",
+                                          height: "5px",
+                                          borderRadius: "50%",
+                                          background: resultTeam.colour,
+                                        }}
+                                      />
+                                      <span
+                                        style={{
+                                          fontSize: "10px",
+                                          color: "var(--slate-light)",
+                                        }}
+                                      >
+                                        {resultTeam.name}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {result.quarter && (
+                                    <span
+                                      style={{
+                                        fontSize: "10px",
+                                        color: "var(--slate-light)",
+                                      }}
+                                    >
+                                      {result.quarter}
+                                    </span>
+                                  )}
+                                  {alreadyLinked && (
+                                    <span
+                                      style={{
+                                        fontSize: "10px",
+                                        color: "var(--slate-light)",
+                                      }}
+                                    >
+                                      Already linked
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {deps.length === 0 && !depSearch && (
+                      <p
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--slate-light)",
+                          fontStyle: "italic",
+                          marginTop: "4px",
+                        }}
+                      >
+                        No dependencies registered — search above to link
+                        features.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -2725,22 +3107,28 @@ export default function Roadmap() {
   const [mappingOutcome, setMappingOutcome] = useState(null);
   const [addingOutcome, setAddingOutcome] = useState(null); // { pillarId, goalId, goal };
   const [filterPillar, setFilterPillar] = useState("");
-  const [filterSMT, setFilterSMT] = useState(false)
+  const [filterSMT, setFilterSMT] = useState(false);
+  const [dependencies, setDependencies] = useState([]);
 
   async function loadAll() {
-    const [ir, pr, gr, tr, or] = await Promise.all([
+    const [ir, pr, gr, tr, or, dr] = await Promise.all([
       supabase.from("roadmap_items").select("*").order("created_at"),
       supabase.from("pillars").select("*").order("sort_order"),
       supabase.from("goals").select("*"),
       supabase.from("teams").select("*").order("sort_order"),
       supabase.from("quarterly_outcomes").select("*"),
+      supabase.from("dependencies").select("from_item_id, to_item_id"),
     ]);
     const teamsData = tr.data || [];
+    const depsData = dr.data || [];
     setItems(
       (ir.data || []).map((item) => ({
         ...item,
         team_colour:
           teamsData.find((t) => t.id === item.team_id)?.colour || null,
+        dep_count: depsData.filter(
+          (d) => d.from_item_id === item.id || d.to_item.id === item.id,
+        ).length,
       })),
     );
     setPillars(pr.data || []);
@@ -2748,6 +3136,7 @@ export default function Roadmap() {
     setTeams(teamsData);
     setOutcomes(or.data || []);
     setLoading(false);
+    setDependencies(dr.data || []);
   }
 
   useEffect(() => {
@@ -2864,7 +3253,7 @@ export default function Roadmap() {
           item.financial_year === filterYear &&
           (filterConfidence === "all" ||
             confidenceLevel(item) === filterConfidence),
-          (!filterSMT || item.smt_priority),
+        !filterSMT || item.smt_priority,
       );
       return assignLanes(rowItems);
     }
@@ -2988,16 +3377,21 @@ export default function Roadmap() {
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
-                    <button
-            onClick={() => setFilterSMT(f => !f)}
+          <button
+            onClick={() => setFilterSMT((f) => !f)}
             style={{
-              padding: "6px 12px", borderRadius: "6px", fontSize: "12px",
+              padding: "6px 12px",
+              borderRadius: "6px",
+              fontSize: "12px",
               border: filterSMT ? "none" : "1px solid var(--border)",
               background: filterSMT ? "var(--navy)" : "#fff",
               color: filterSMT ? "#fff" : "var(--slate)",
-              cursor: "pointer", fontFamily: "DM Sans, sans-serif",
+              cursor: "pointer",
+              fontFamily: "DM Sans, sans-serif",
               fontWeight: filterSMT ? "600" : "400",
-              display: "flex", alignItems: "center", gap: "4px"
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
             }}
           >
             ★ SMT
@@ -3634,7 +4028,7 @@ export default function Roadmap() {
                       item.financial_year === filterYear &&
                       (filterConfidence === "all" ||
                         confidenceLevel(item) === filterConfidence),
-                      (!filterSMT || item.smt_priority),
+                    !filterSMT || item.smt_priority,
                   );
                   return rowItems.map((item) => (
                     <TimelineItem
