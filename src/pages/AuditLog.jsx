@@ -111,42 +111,6 @@ function ChangeSummary({ eventType, oldValue, newValue }) {
       lines.push(`${direction} week${Math.abs(diff) !== 1 ? "s" : ""}`);
     }
 
-    if (eventType === "dependency_created") {
-      return (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "var(--slate)",
-            marginTop: "4px",
-            lineHeight: "1.6",
-          }}
-        >
-          <div>
-            <strong>{newValue?.from}</strong> depends on{" "}
-            <strong>{newValue?.to}</strong>
-          </div>
-        </div>
-      );
-    }
-
-    if (eventType === "dependency_removed") {
-      return (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "var(--slate)",
-            marginTop: "4px",
-            lineHeight: "1.6",
-          }}
-        >
-          <div>
-            Removed: <strong>{oldValue?.from}</strong> →{" "}
-            <strong>{oldValue?.to}</strong>
-          </div>
-        </div>
-      );
-    }
-
     if (
       oldValue?.start_week !== undefined &&
       newValue?.start_week !== undefined
@@ -203,6 +167,42 @@ function ChangeSummary({ eventType, oldValue, newValue }) {
       </div>
     );
   }
+
+      if (eventType === "dependency_created") {
+      return (
+        <div
+          style={{
+            fontSize: "11px",
+            color: "var(--slate)",
+            marginTop: "4px",
+            lineHeight: "1.6",
+          }}
+        >
+          <div>
+            <strong>{newValue?.from}</strong> depends on{" "}
+            <strong>{newValue?.to}</strong>
+          </div>
+        </div>
+      );
+    }
+
+    if (eventType === "dependency_removed") {
+      return (
+        <div
+          style={{
+            fontSize: "11px",
+            color: "var(--slate)",
+            marginTop: "4px",
+            lineHeight: "1.6",
+          }}
+        >
+          <div>
+            Removed: <strong>{oldValue?.from}</strong> →{" "}
+            <strong>{oldValue?.to}</strong>
+          </div>
+        </div>
+      );
+    }
 
   if (eventType === "item_updated") {
     const changes = [];
