@@ -89,25 +89,6 @@ function statusMeta(v) {
   return STATUSES.find((s) => s.value === v) || STATUSES[0];
 }
 
-function confidenceLevel(item) {
-  const f = [
-    item.pillar_id,
-    item.goal_id,
-    item.value_statement,
-    item.lead_metric_name,
-  ].filter(Boolean).length;
-  return f === 4 ? "high" : f >= 2 ? "medium" : "low";
-}
-function confidenceMeta(l) {
-  return (
-    {
-      high: { color: "#166534", bg: "#DCFCE7", label: "High" },
-      medium: { color: "#92400E", bg: "#FEF3C7", label: "Medium" },
-      low: { color: "#991B1B", bg: "#FEE2E2", label: "Low" },
-    }[l] || { color: "#991B1B", bg: "#FEE2E2", label: "Low" }
-  );
-}
-
 function assignLanes(rowItems) {
   const sorted = [...rowItems].sort(
     (a, b) => (a.start_week ?? 0) - (b.start_week ?? 0),
@@ -170,7 +151,6 @@ function defaultWeeks(quarter) {
 function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
   const dragRef = useRef(null);
   const tm = typeMeta(item.type);
-  const cm = confidenceMeta(confidenceLevel(item));
   const teamColour = item.team_colour || null;
 
   const sw = item.start_week ?? quarterStartWeek(item.quarter || "Q1");
@@ -257,6 +237,7 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
 
   return (
     <g>
+      {/* Main box */}
       <rect
         x={x + 2}
         y={rowY + laneOffsetY + 5}
@@ -272,61 +253,93 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
         }}
         style={{ cursor: "grab" }}
       />
-      {/* Confidence dot */}
-      <circle
-        cx={x + w - 10}
-        cy={rowY + laneOffsetY + 12}
-        r={3.5}
-        fill={cm.color}
-        style={{ pointerEvents: "none" }}
-      />
 
-      {item.dep_count > 0 && (
-        <>
-          <rect
-            x={x + 10}
-            y={rowY + laneOffsetY + 5}
-            width={16}
-            height={14}
-            rx={3}
-            fill="#0F172A"
-            style={{ pointerEvents: "none" }}
-          />
-          <text
-            x={x + 18}
-            y={rowY + laneOffsetY + 15}
-            textAnchor="middle"
-            fontSize={8}
-            fontWeight={700}
-            fontFamily="DM Sans, sans-serif"
-            fill="white"
-            style={{ pointerEvents: "none" }}
-          >
-            {item.dep_count}
-          </text>
-        </>
-      )}
-
-      {/* SMT priority flag */}
-      {item.smt_priority && (
-        <text
-          x={x + 8}
-          y={rowY + laneOffsetY + 13}
-          fontSize={9}
-          fontFamily="DM Sans, sans-serif"
-          fontWeight={700}
-          fill={teamColour || tm.color}
-          style={{ pointerEvents: "none" }}
-        >
-          ★
-        </text>
-      )}
-
+      {/* Top metadata row — type badge + team name + dep count + SMT star */}
       <foreignObject
-        x={x + 7}
+        x={x + 6}
         y={rowY + laneOffsetY + 6}
-        width={Math.max(0, w - 20)}
-        height={itemH - 4}
+        width={Math.max(0, w - 12)}
+        height={16}
+        style={{ pointerEvents: "none" }}
+      >
+        <div
+          xmlns="http://www.w3.org/1999/xhtml"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "3px",
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "8px",
+              fontWeight: "700",
+              padding: "1px 4px",
+              borderRadius: "2px",
+              background: teamColour ? teamColour + "40" : tm.bg,
+              color: teamColour || tm.color,
+              fontFamily: "DM Sans, sans-serif",
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              flexShrink: 0,
+            }}
+          >
+            {tm.label}
+          </span>
+          {item.team_name && (
+            <span
+              style={{
+                fontSize: "9px",
+                color: teamColour || tm.color,
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: "500",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                flexShrink: 1,
+              }}
+            >
+              {item.team_name}
+            </span>
+          )}
+          {item.dep_count > 0 && (
+            <span
+              style={{
+                fontSize: "8px",
+                fontWeight: "700",
+                padding: "1px 4px",
+                borderRadius: "2px",
+                background: "#0F172A",
+                color: "#fff",
+                fontFamily: "DM Sans, sans-serif",
+                flexShrink: 0,
+              }}
+            >
+              {item.dep_count}
+            </span>
+          )}
+          {item.smt_priority && (
+            <span
+              style={{
+                fontSize: "9px",
+                color: teamColour || tm.color,
+                fontFamily: "DM Sans, sans-serif",
+                flexShrink: 0,
+              }}
+            >
+              ★
+            </span>
+          )}
+        </div>
+      </foreignObject>
+
+      {/* Feature name */}
+      <foreignObject
+        x={x + 6}
+        y={rowY + laneOffsetY + 22}
+        width={Math.max(0, w - 12)}
+        height={itemH - 20}
         style={{ pointerEvents: "none" }}
       >
         <div
@@ -347,7 +360,8 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
           {item.title}
         </div>
       </foreignObject>
-      {/* Left resize handle */}
+
+      {/* Resize handles */}
       <rect
         x={x + 2}
         y={rowY + laneOffsetY + 5}
@@ -358,7 +372,6 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
         style={{ cursor: "ew-resize" }}
         onMouseDown={(e) => startDrag(e, "left")}
       />
-      {/* Right resize handle */}
       <rect
         x={x + w - 10}
         y={rowY + laneOffsetY + 5}
@@ -3267,7 +3280,6 @@ export default function Roadmap() {
   const [selected, setSelected] = useState(null);
   const [filterYear, setFilterYear] = useState(CURRENT_YEAR);
   const [filterTeam, setFilterTeam] = useState("");
-  const [filterConfidence, setFilterConfidence] = useState("all");
   const [collapsedPillars, setCollapsedPillars] = useState({});
   const [collapsedTeams, setCollapsedTeams] = useState({});
   const saveTimer = useRef({});
@@ -3291,8 +3303,8 @@ export default function Roadmap() {
     setItems(
       (ir.data || []).map((item) => ({
         ...item,
-        team_colour:
-          teamsData.find((t) => t.id === item.team_id)?.colour || null,
+        team_colour: teamsData.find((t) => t.id === item.team_id)?.colour || null,
+        team_name: teamsData.find(t => t.id === item.team_id)?.name || null, 
         dep_count: depsData.filter(
           (d) => d && (d.from_item_id === item.id || d.to_item_id === item.id),
         ).length,
@@ -3410,6 +3422,7 @@ export default function Roadmap() {
     if (r.type === "unassigned") return TEAM_H;
     return TEAM_H;
   };
+
   // Pre-calculate lane counts per row
   const laneMaps = rows.map((row) => {
     if (row.type === "team" && !row.isCollapsed && row.goal) {
@@ -3418,9 +3431,7 @@ export default function Roadmap() {
           item.goal_id === row.goal.id &&
           item.team_id === row.team.id &&
           item.financial_year === filterYear &&
-          (filterConfidence === "all" ||
-            confidenceLevel(item) === filterConfidence),
-        !filterSMT || item.smt_priority,
+          !filterSMT || item.smt_priority,
       );
       return assignLanes(rowItems);
     }
@@ -3534,16 +3545,6 @@ export default function Roadmap() {
               </option>
             ))}
           </select>
-          <select
-            style={sel}
-            value={filterConfidence}
-            onChange={(e) => setFilterConfidence(e.target.value)}
-          >
-            <option value="all">All confidence</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
           <button
             onClick={() => setFilterSMT((f) => !f)}
             style={{
@@ -3611,29 +3612,6 @@ export default function Roadmap() {
             <span style={{ fontSize: "10px", color: "var(--slate)" }}>
               {t.label}
             </span>
-          </div>
-        ))}
-        <div
-          style={{ width: "1px", background: "var(--border)", margin: "0 4px" }}
-        />
-        {[
-          ["#166534", "High"],
-          ["#92400E", "Medium"],
-          ["#991B1B", "Low"],
-        ].map(([c, l]) => (
-          <div
-            key={l}
-            style={{ display: "flex", alignItems: "center", gap: "4px" }}
-          >
-            <div
-              style={{
-                width: "7px",
-                height: "7px",
-                borderRadius: "50%",
-                background: c,
-              }}
-            />
-            <span style={{ fontSize: "10px", color: "var(--slate)" }}>{l}</span>
           </div>
         ))}
       </div>
@@ -4193,9 +4171,7 @@ export default function Roadmap() {
                       item.goal_id === row.goal.id &&
                       item.team_id === row.team.id &&
                       item.financial_year === filterYear &&
-                      (filterConfidence === "all" ||
-                        confidenceLevel(item) === filterConfidence),
-                    !filterSMT || item.smt_priority,
+                      !filterSMT || item.smt_priority,
                   );
                   return rowItems.map((item) => (
                     <TimelineItem
