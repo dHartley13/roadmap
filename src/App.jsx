@@ -3,6 +3,8 @@ import Pillars from './pages/Pillars'
 import Roadmap from './pages/Roadmap'
 import Settings from './pages/Settings'
 import AuditLog from './pages/AuditLog'
+import Dependencies from './pages/Dependencies'
+import ItemDetailPanel from './pages/ItemDetailPanel'
 
 function Sidebar() {
   return (
@@ -38,7 +40,8 @@ function Sidebar() {
           { to: '/replan', label: 'Replan', icon: '⟳', soon: true },
           { to: '/smt', label: 'SMT View', icon: '↗', soon: true },
           { to: '/audit', label: 'Audit Log', icon: '◷' },
-          { to: '/settings', label: 'Settings', icon: '⚙' }
+          { to: '/settings', label: 'Settings', icon: '⚙' },
+          { to: '/dependencies', label: 'Dependencies', icon: '⟳' }
 
         ].map(({ to, label, icon, soon }) => (
           <NavLink
@@ -88,6 +91,8 @@ export default function App() {
             <Route path="/roadmap" element={<Roadmap />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/audit" element={<AuditLog />} />
+            <Route path="/dependencies" element={<Dependencies />} />
+            <Route path="/ItemDetailPanel" element={<ItemDetailPanel />} />
           </Routes>
         </main>
       </div>
