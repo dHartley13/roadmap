@@ -55,7 +55,7 @@ const WEEK_H = 20;
 const HEADER_H = QUARTER_H + MONTH_H + WEEK_H;
 const PILLAR_H = 28;
 const TEAM_H = 44;
-const OUTCOME_H = 120;
+const OUTCOME_H = 100;
 const LEFT_W = 240;
 
 const ITEM_TYPES = [
@@ -1232,6 +1232,7 @@ function OutcomeCell({
   onReload,
   onOpenMapping,
   onAddOutcome,
+  pillarColour,
 }) {
   const [editingOutcome, setEditingOutcome] = useState(null);
   const [editingText, setEditingText] = useState("");
@@ -1297,23 +1298,39 @@ function OutcomeCell({
         padding: "4px 6px",
         height: OUTCOME_H,
         maxHeight: OUTCOME_H,
-        overflow: "auto",
+        overflowY: "auto",
         display: "flex",
         flexDirection: "column",
         gap: "3px",
       }}
     >
+      <button
+        onClick={() => onAddOutcome()}
+        style={{
+          fontSize: "9px",
+          color: pillarColour || "var(--slate-light)",
+          background: "transparent",
+          border: "1px dashed var(--border)",
+          borderRadius: "4px",
+          padding: "2px 6px",
+          cursor: "pointer",
+          fontFamily: "Inter, sans-serif",
+          alignSelf: "flex-start",
+        }}
+      >
+        + outcome
+      </button>
       {qOutcomes.map((o) => (
         <div
           key={o.id}
           style={{
-            background: "#fff",
-            border: "1px solid var(--border)",
-            borderRadius: "4px",
-            padding: "4px 8px",
             display: "flex",
             alignItems: "flex-start",
             gap: "6px",
+            padding: "3px 6px",
+            borderRadius: "4px",
+            border: `1px solid ${pillarColour || "var(--border)"}30`,
+            background: pillarColour,
           }}
         >
           {editingOutcome?.id === o.id ? (
@@ -1340,13 +1357,14 @@ function OutcomeCell({
             <span
               onClick={() => onOpenMapping(o)}
               style={{
-                fontSize: "10px",
-                color: "var(--navy)",
-                lineHeight: "1.4",
+                fontSize: "9px",
+                fontWeight: "500",
+                color: '#ffffff',
+                lineHeight: "1.3",
                 flex: 1,
                 cursor: "pointer",
+                fontFamily: "Inter, sans-serif",
               }}
-              title="Click to map contributing features"
             >
               {o.summary}
             </span>
@@ -1387,23 +1405,6 @@ function OutcomeCell({
           </button>
         </div>
       ))}
-
-      <button
-        onClick={() => onAddOutcome()}
-        style={{
-          fontSize: "9px",
-          color: "var(--slate-light)",
-          background: "transparent",
-          border: "1px dashed var(--border)",
-          borderRadius: "4px",
-          padding: "2px 6px",
-          cursor: "pointer",
-          fontFamily: "Inter, sans-serif",
-          alignSelf: "flex-start",
-        }}
-      >
-        + outcome
-      </button>
     </div>
   );
 }
@@ -1903,6 +1904,7 @@ export default function Roadmap() {
     if (r.type === "pillar") return 36;
     if (r.type === "focus") return Math.max(80, laneCount * (TEAM_H - 4) + 8);
     if (r.type === "empty") return TEAM_H;
+    if (r.type === "outcome") return OUTCOME_H;
     if (r.type === "unassigned") return TEAM_H;
     return TEAM_H;
   };
@@ -2208,7 +2210,8 @@ export default function Roadmap() {
                         display: "flex",
                         alignItems: "flex-start",
                         padding: "8px 12px 8px 16px",
-                        borderBottom: "1px solid var(--border)",
+                        borderTop: "1px solid #CBD5E1",
+                        borderBottom: "none",
                         borderLeft: `3px solid ${row.pillar.colour}`,
                         background: row.pillar.colour + "0D",
                         gap: "8px",
@@ -2241,7 +2244,7 @@ export default function Roadmap() {
                                 style={{
                                   fontSize: "9px",
                                   fontWeight: "500",
-                                  color: "var(--slate-light)",
+                                  color: "var(--slate)",
                                   whiteSpace: "nowrap",
                                   fontFamily: "Inter, sans-serif",
                                 }}
@@ -2309,9 +2312,9 @@ export default function Roadmap() {
                         flexDirection: "column",
                         justifyContent: "center",
                         padding: "0 12px 0 16px",
-                        borderBottom: "1px solid var(--border)",
-                        background: "#F8FFF9",
-                        borderLeft: `3px solid ${row.pillar.colour}40`,
+                        borderBottom: "1px solid #CBD5E1",
+                        background: row.pillar.colour + "0D",
+                        borderLeft: `3px solid ${row.pillar.colour}`,
                       }}
                     >
                       <span
@@ -2503,7 +2506,7 @@ export default function Roadmap() {
                         x2={x}
                         y2={totalH}
                         stroke="#E2E8F0"
-                        strokeWidth={0.5}
+                        strokeWidth={1}
                       />
                     </g>
                   );
@@ -2560,13 +2563,23 @@ export default function Roadmap() {
                         />
                       )}
                       {row.type === "outcome" && (
-                        <rect
-                          x={0}
-                          y={y}
-                          width={TOTAL_W}
-                          height={h}
-                          fill="#F0FDF4"
-                        />
+                        <>
+                          <rect
+                            x={0}
+                            y={y}
+                            width={TOTAL_W}
+                            height={h}
+                            fill="#ffffff"
+                          />
+                          <rect
+                            x={0}
+                            y={y}
+                            width={TOTAL_W}
+                            height={h}
+                            fill={row.pillar.colour}
+                            opacity={0.06}
+                          />
+                        </>
                       )}
                       {row.type === "unassigned" && (
                         <rect
@@ -2586,40 +2599,56 @@ export default function Roadmap() {
                           fill={row.pillar.colour + "0D"}
                         />
                       )}
+                      {row.type === "focus" && (
+                        <line
+                          x1={0}
+                          y1={y}
+                          x2={TOTAL_W}
+                          y2={y}
+                          stroke="#CBD5E1"
+                          strokeWidth={1}
+                        />
+                      )}
                       <line
                         x1={0}
                         y1={y + h}
                         x2={TOTAL_W}
                         y2={y + h}
-                        stroke="#E2E8F0"
-                        strokeWidth={0.5}
+                        stroke={
+                          row.type === "focus" ? "transparent" : "#CBD5E1"
+                        }
+                        strokeWidth={1}
                       />
                     </g>
                   );
                 })}
 
-                {/* Quarter dividers on outcome rows */}
-                {rows.map((row, i) => {
-                  if (row.type !== "outcome") return null;
-                  const y = rowYs[i];
-                  const h = rowH(row);
-                  return QUARTERS.map((q) => {
-                    const sx = MONTHS.indexOf(QUARTER_MONTHS[q][0]) * MONTH_W;
-                    const w = 3 * MONTH_W;
-                    return (
-                      <rect
-                        key={`oq-${i}-${q}`}
-                        x={sx + 1}
-                        y={y + 1}
-                        width={w - 2}
-                        height={h - 2}
-                        fill="none"
-                        stroke="#BBF7D0"
+                {/* Quarter borders */}
+                {QUARTERS.map((q) => {
+                  const sx = MONTHS.indexOf(QUARTER_MONTHS[q][0]) * MONTH_W;
+                  const w = 3 * MONTH_W;
+                  return (
+                    <g key={`qb-${q}`}>
+                      {/* Left border */}
+                      <line
+                        x1={sx}
+                        y1={HEADER_H}
+                        x2={sx}
+                        y2={totalH}
+                        stroke="#CBD5E1"
                         strokeWidth={1}
-                        rx={3}
                       />
-                    );
-                  });
+                      {/* Right border */}
+                      <line
+                        x1={sx + w}
+                        y1={HEADER_H}
+                        x2={sx + w}
+                        y2={totalH}
+                        stroke="#CBD5E1"
+                        strokeWidth={1}
+                      />
+                    </g>
+                  );
                 })}
 
                 {/* Roadmap items */}
@@ -2707,6 +2736,7 @@ export default function Roadmap() {
                             items={items}
                             onReload={loadAll}
                             onOpenMapping={setMappingOutcome}
+                            pillarColour={row.pillar.colour}
                             onAddOutcome={() =>
                               setAddingOutcome({
                                 pillarId: row.pillar.id,
