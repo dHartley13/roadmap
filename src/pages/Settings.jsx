@@ -27,7 +27,7 @@ function AddTeamModal({ onClose, onSaved }) {
   const inputStyle = {
     width: '100%', padding: '8px 10px',
     border: '1px solid var(--border)', borderRadius: '6px',
-    fontSize: '12px', fontFamily: 'DM Sans, sans-serif',
+    fontSize: '12px', fontFamily: 'Inter, sans-serif',
     color: 'var(--navy)', background: '#fff', outline: 'none'
   }
   const labelStyle = {
@@ -67,8 +67,8 @@ function AddTeamModal({ onClose, onSaved }) {
           {error && <div style={{ fontSize: '12px', color: '#991B1B', background: '#FEE2E2', padding: '8px 12px', borderRadius: '4px' }}>{error}</div>}
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '4px' }}>
-            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', fontSize: '12px', fontWeight: '500', color: 'var(--slate)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>Cancel</button>
-            <button onClick={save} disabled={saving} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: 'var(--blue)', fontSize: '12px', fontWeight: '600', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'DM Sans, sans-serif' }}>
+            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border)', background: '#fff', fontSize: '12px', fontWeight: '500', color: 'var(--slate)', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: 'var(--blue)', fontSize: '12px', fontWeight: '600', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'Inter, sans-serif' }}>
               {saving ? 'Saving...' : 'Add team'}
             </button>
           </div>
@@ -237,7 +237,7 @@ export default function Settings() {
                 color: activeSection === s.id ? 'var(--blue)' : s.soon ? 'var(--slate-light)' : 'var(--slate)',
                 fontSize: '13px', fontWeight: activeSection === s.id ? '600' : '400',
                 cursor: s.soon ? 'not-allowed' : 'pointer',
-                fontFamily: 'DM Sans, sans-serif', textAlign: 'left',
+                fontFamily: 'Inter, sans-serif', textAlign: 'left',
                 opacity: s.soon ? 0.5 : 1,
               }}>
               <span>{s.icon}</span>
@@ -263,7 +263,7 @@ export default function Settings() {
               <button onClick={() => setShowAddTeam(true)} style={{
                 padding: '8px 16px', borderRadius: '8px', border: 'none',
                 background: 'var(--navy)', fontSize: '12px', fontWeight: '600',
-                color: '#fff', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                color: '#fff', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
                 flexShrink: 0, marginLeft: '16px'
               }}>+ Add team</button>
             </div>
@@ -280,7 +280,7 @@ export default function Settings() {
                 <button onClick={() => setShowAddTeam(true)} style={{
                   padding: '8px 20px', borderRadius: '8px', border: 'none',
                   background: 'var(--blue)', fontSize: '12px', fontWeight: '600',
-                  color: '#fff', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif'
+                  color: '#fff', cursor: 'pointer', fontFamily: 'Inter, sans-serif'
                 }}>Add first team</button>
               </div>
             ) : (

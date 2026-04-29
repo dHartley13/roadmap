@@ -288,7 +288,7 @@ function TimelineItem({
               borderRadius: "2px",
               background: teamColour ? teamColour + "40" : tm.bg,
               color: teamColour || tm.color,
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
               letterSpacing: "0.04em",
               textTransform: "uppercase",
               flexShrink: 0,
@@ -301,7 +301,7 @@ function TimelineItem({
               style={{
                 fontSize: "9px",
                 color: teamColour || tm.color,
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
                 fontWeight: "500",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -320,7 +320,7 @@ function TimelineItem({
                 borderRadius: "2px",
                 background: "#0F172A",
                 color: "#fff",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
                 flexShrink: 0,
               }}
             >
@@ -332,7 +332,7 @@ function TimelineItem({
               style={{
                 fontSize: "9px",
                 color: teamColour || tm.color,
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
                 flexShrink: 0,
               }}
             >
@@ -356,7 +356,7 @@ function TimelineItem({
             fontSize: "10px",
             fontWeight: "600",
             color: teamColour || tm.color,
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "Inter, sans-serif",
             lineHeight: "1.3",
             overflow: "hidden",
             display: "-webkit-box",
@@ -467,7 +467,7 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "#fff",
     outline: "none",
@@ -545,7 +545,7 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
                     padding: "5px 8px",
                     border: "1px solid var(--blue)",
                     borderRadius: "4px",
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "Inter, sans-serif",
                     outline: "none",
                   }}
                 />
@@ -559,7 +559,7 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
                     background: "var(--blue)",
                     color: "#fff",
                     cursor: "pointer",
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "Inter, sans-serif",
                   }}
                 >
                   Save
@@ -574,7 +574,7 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
                     background: "#fff",
                     color: "var(--slate)",
                     cursor: "pointer",
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "Inter, sans-serif",
                   }}
                 >
                   ✕
@@ -613,7 +613,7 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
                     borderRadius: "4px",
                     padding: "2px 8px",
                     cursor: "pointer",
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "Inter, sans-serif",
                     flexShrink: 0,
                     whiteSpace: "nowrap",
                   }}
@@ -767,7 +767,7 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
                                 borderRadius: "4px",
                                 padding: "3px 8px",
                                 cursor: "pointer",
-                                fontFamily: "DM Sans, sans-serif",
+                                fontFamily: "Inter, sans-serif",
                                 flexShrink: 0,
                               }}
                             >
@@ -916,7 +916,7 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
                               borderRadius: "4px",
                               padding: "4px 10px",
                               cursor: "pointer",
-                              fontFamily: "DM Sans, sans-serif",
+                              fontFamily: "Inter, sans-serif",
                               fontWeight: "600",
                               flexShrink: 0,
                             }}
@@ -952,7 +952,7 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
               fontWeight: "600",
               color: "#fff",
               cursor: "pointer",
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
             }}
           >
             Done
@@ -1010,7 +1010,7 @@ function AddOutcomeModal({
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "#fff",
     outline: "none",
@@ -1189,7 +1189,7 @@ function AddOutcomeModal({
                 fontSize: "12px",
                 color: "var(--slate)",
                 cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               Cancel
@@ -1207,7 +1207,7 @@ function AddOutcomeModal({
                 color: "#fff",
                 cursor: saving ? "not-allowed" : "pointer",
                 opacity: saving ? 0.7 : 1,
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               {saving ? "Saving…" : "Add outcome"}
@@ -1332,7 +1332,7 @@ function OutcomeCell({
                 padding: "2px 4px",
                 border: "1px solid var(--blue)",
                 borderRadius: "3px",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
                 outline: "none",
               }}
             />
@@ -1398,7 +1398,7 @@ function OutcomeCell({
           borderRadius: "4px",
           padding: "2px 6px",
           cursor: "pointer",
-          fontFamily: "DM Sans, sans-serif",
+          fontFamily: "Inter, sans-serif",
           alignSelf: "flex-start",
         }}
       >
@@ -1487,7 +1487,7 @@ function AddItemModal({
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "#fff",
     outline: "none",
@@ -1738,7 +1738,7 @@ function AddItemModal({
                 fontWeight: "500",
                 color: "var(--slate)",
                 cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               Cancel
@@ -1756,7 +1756,7 @@ function AddItemModal({
                 color: "#fff",
                 cursor: saving ? "not-allowed" : "pointer",
                 opacity: saving ? 0.7 : 1,
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               {saving ? "Saving…" : "Add to roadmap"}
@@ -1900,8 +1900,8 @@ export default function Roadmap() {
 
   // Y positions
   const rowH = (r, laneCount = 1) => {
-    if (r.type === "pillar") return PILLAR_H;
-    if (r.type === 'focus') return Math.max(80, laneCount * (TEAM_H - 4) + 8)
+    if (r.type === "pillar") return 36;
+    if (r.type === "focus") return Math.max(80, laneCount * (TEAM_H - 4) + 8);
     if (r.type === "empty") return TEAM_H;
     if (r.type === "unassigned") return TEAM_H;
     return TEAM_H;
@@ -1944,7 +1944,7 @@ export default function Roadmap() {
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "#fff",
     cursor: "pointer",
@@ -2038,7 +2038,7 @@ export default function Roadmap() {
               background: filterSMT ? "var(--navy)" : "#fff",
               color: filterSMT ? "#fff" : "var(--slate)",
               cursor: "pointer",
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
               fontWeight: filterSMT ? "600" : "400",
               display: "flex",
               alignItems: "center",
@@ -2061,7 +2061,7 @@ export default function Roadmap() {
               fontWeight: "600",
               color: "#fff",
               cursor: "pointer",
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
             }}
           >
             + Add item
@@ -2158,9 +2158,9 @@ export default function Roadmap() {
                         height: h,
                         display: "flex",
                         alignItems: "center",
-                        padding: "0 12px",
-                        background: row.pillar.colour + "18",
-                        borderBottom: "1px solid var(--border)",
+                        padding: "0 14px",
+                        background: row.pillar.colour,
+                        borderBottom: "1px solid rgba(0,0,0,0.1)",
                         cursor: "pointer",
                         gap: "8px",
                       }}
@@ -2174,24 +2174,16 @@ export default function Roadmap() {
                         })
                       }
                     >
-                      <div
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          background: row.pillar.colour,
-                          flexShrink: 0,
-                        }}
-                      />
                       <span
                         style={{
                           fontSize: "11px",
                           fontWeight: "700",
-                          color: "var(--navy)",
+                          color: "#fff",
                           flex: 1,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
+                          letterSpacing: "0.02em",
                         }}
                       >
                         {row.pillar.name}
@@ -2199,7 +2191,7 @@ export default function Roadmap() {
                       <span
                         style={{
                           fontSize: "10px",
-                          color: "var(--slate-light)",
+                          color: "rgba(255,255,255,0.7)",
                         }}
                       >
                         {row.isCollapsed ? "▸" : "▾"}
@@ -2208,17 +2200,17 @@ export default function Roadmap() {
                   );
 
                 if (row.type === "focus")
-                  return ( 
+                  return (
                     <div
                       key={i}
                       style={{
                         height: rowH(row, laneMaps[i].laneCount),
                         display: "flex",
                         alignItems: "flex-start",
-                        padding: "8px 12px 8px 24px",
+                        padding: "8px 12px 8px 16px",
                         borderBottom: "1px solid var(--border)",
                         borderLeft: `3px solid ${row.pillar.colour}`,
-                        background: "#fff",
+                        background: row.pillar.colour + "0D",
                         gap: "8px",
                       }}
                     >
@@ -2238,8 +2230,8 @@ export default function Roadmap() {
                             >
                               <div
                                 style={{
-                                  width: "6px",
-                                  height: "6px",
+                                  width: "5px",
+                                  height: "5px",
                                   borderRadius: "50%",
                                   background: leadTeam.colour,
                                   flexShrink: 0,
@@ -2248,9 +2240,10 @@ export default function Roadmap() {
                               <span
                                 style={{
                                   fontSize: "9px",
-                                  fontWeight: "600",
+                                  fontWeight: "500",
                                   color: "var(--slate-light)",
                                   whiteSpace: "nowrap",
+                                  fontFamily: "Inter, sans-serif",
                                 }}
                               >
                                 {leadTeam.name}
@@ -2262,10 +2255,12 @@ export default function Roadmap() {
                           style={{
                             fontSize: "10px",
                             fontWeight: "600",
-                            color: "var(--slate)",
-                            letterSpacing: "0.04em",
-                            lineHeight: "1.4",
-                            whiteSpace: "normal",
+                            color: "var(--navy)",
+                            letterSpacing: "0.01em",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            fontFamily: "Inter, sans-serif",
                           }}
                         >
                           {row.goal.driver_statement ||
@@ -2296,6 +2291,7 @@ export default function Roadmap() {
                           justifyContent: "center",
                           flexShrink: 0,
                           marginTop: "2px",
+                          fontFamily: "Inter, sans-serif",
                         }}
                       >
                         +
@@ -2312,19 +2308,20 @@ export default function Roadmap() {
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "center",
-                        padding: "0 12px 0 20px",
+                        padding: "0 12px 0 16px",
                         borderBottom: "1px solid var(--border)",
-                        background: "#F0FDF4",
-                        borderLeft: `3px solid ${row.pillar.colour}`,
+                        background: "#F8FFF9",
+                        borderLeft: `3px solid ${row.pillar.colour}40`,
                       }}
                     >
                       <span
                         style={{
-                          fontSize: "9px",
+                          fontSize: "8px",
                           fontWeight: "700",
                           color: "#166534",
-                          letterSpacing: "0.06em",
+                          letterSpacing: "0.08em",
                           textTransform: "uppercase",
+                          fontFamily: "Inter, sans-serif",
                         }}
                       >
                         Outcomes
@@ -2336,9 +2333,10 @@ export default function Roadmap() {
                             color: "#166534",
                             marginTop: "2px",
                             opacity: 0.7,
+                            fontFamily: "Inter, sans-serif",
                           }}
                         >
-                          Measuring: {row.goal.lead_metric_name}
+                          {row.goal.lead_metric_name}
                           {row.goal.lead_metric_baseline &&
                             row.goal.lead_metric_target && (
                               <span style={{ marginLeft: "4px", opacity: 0.8 }}>
@@ -2468,7 +2466,7 @@ export default function Roadmap() {
                         fill="white"
                         fontSize={12}
                         fontWeight={700}
-                        fontFamily="DM Sans, sans-serif"
+                        fontFamily="Inter, sans-serif"
                       >
                         {q}
                       </text>
@@ -2494,7 +2492,7 @@ export default function Roadmap() {
                         textAnchor="middle"
                         fill="#475569"
                         fontSize={10}
-                        fontFamily="DM Sans, sans-serif"
+                        fontFamily="Inter, sans-serif"
                         fontWeight={500}
                       >
                         {m}
@@ -2530,7 +2528,7 @@ export default function Roadmap() {
                         textAnchor="middle"
                         fill="#94A3B8"
                         fontSize={8}
-                        fontFamily="DM Sans, sans-serif"
+                        fontFamily="Inter, sans-serif"
                       >
                         W{wNum}
                       </text>
@@ -2558,7 +2556,7 @@ export default function Roadmap() {
                           y={y}
                           width={TOTAL_W}
                           height={h}
-                          fill={row.pillar.colour + "10"}
+                          fill={row.pillar.colour}
                         />
                       )}
                       {row.type === "outcome" && (
@@ -2585,7 +2583,7 @@ export default function Roadmap() {
                           y={y}
                           width={TOTAL_W}
                           height={h}
-                          fill="#F8FAFC"
+                          fill={row.pillar.colour + "0D"}
                         />
                       )}
                       <line

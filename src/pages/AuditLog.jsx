@@ -339,7 +339,7 @@ export default function AuditLog() {
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "#fff",
     cursor: "pointer",
@@ -387,7 +387,7 @@ export default function AuditLog() {
             fontSize: "12px",
             color: "var(--slate)",
             cursor: "pointer",
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "Inter, sans-serif",
             flexShrink: 0,
             marginLeft: "16px",
           }}

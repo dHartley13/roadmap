@@ -288,7 +288,7 @@ export default function Dependencies() {
             border: "1px solid var(--border)",
             borderRadius: "8px",
             fontSize: "13px",
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "Inter, sans-serif",
             color: "var(--navy)",
             background: "#fff",
             outline: "none",

@@ -234,7 +234,7 @@ export default function ItemDetailPanel({
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "#fff",
     outline: "none",
@@ -300,7 +300,7 @@ export default function ItemDetailPanel({
                   background: "transparent",
                   cursor: "pointer",
                   padding: "0 0 8px 0",
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "Inter, sans-serif",
                   fontSize: "11px",
                   color: "var(--blue)",
                 }}
@@ -505,7 +505,7 @@ export default function ItemDetailPanel({
                       background: "transparent",
                       border: "none",
                       cursor: "pointer",
-                      fontFamily: "DM Sans, sans-serif",
+                      fontFamily: "Inter, sans-serif",
                       padding: 0,
                       fontStyle: "italic",
                     }}
@@ -754,7 +754,7 @@ export default function ItemDetailPanel({
                               borderRadius: "4px",
                               padding: "3px 8px",
                               cursor: "pointer",
-                              fontFamily: "DM Sans, sans-serif",
+                              fontFamily: "Inter, sans-serif",
                               flexShrink: 0,
                               whiteSpace: "nowrap",
                             }}
@@ -1292,7 +1292,7 @@ export default function ItemDetailPanel({
                             border: "1px solid var(--border)",
                             borderRadius: "6px",
                             fontSize: "12px",
-                            fontFamily: "DM Sans, sans-serif",
+                            fontFamily: "Inter, sans-serif",
                             color: "var(--navy)",
                             background: "#fff",
                             outline: "none",
@@ -1460,7 +1460,7 @@ export default function ItemDetailPanel({
               fontSize: "12px",
               color: "var(--slate-light)",
               cursor: "pointer",
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
             }}
           >
             Delete
@@ -1478,7 +1478,7 @@ export default function ItemDetailPanel({
                   fontWeight: "600",
                   color: "#fff",
                   cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "Inter, sans-serif",
                 }}
               >
                 Edit
@@ -1495,7 +1495,7 @@ export default function ItemDetailPanel({
                     fontSize: "12px",
                     color: "var(--slate)",
                     cursor: "pointer",
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "Inter, sans-serif",
                   }}
                 >
                   Cancel
@@ -1513,7 +1513,7 @@ export default function ItemDetailPanel({
                     color: "#fff",
                     cursor: saving ? "not-allowed" : "pointer",
                     opacity: saving ? 0.7 : 1,
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "Inter, sans-serif",
                   }}
                 >
                   {saving ? "Saving…" : "Save"}
@@ -1582,7 +1582,7 @@ export default function ItemDetailPanel({
                     fontSize: "12px",
                     color: "var(--slate)",
                     cursor: "pointer",
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "Inter, sans-serif",
                   }}
                 >
                   Cancel
@@ -1598,7 +1598,7 @@ export default function ItemDetailPanel({
                     fontWeight: "600",
                     color: "#fff",
                     cursor: "pointer",
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "Inter, sans-serif",
                   }}
                 >
                   Delete

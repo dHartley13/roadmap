@@ -96,7 +96,7 @@ function EditFocusModal({ goal, teams, onClose, onSaved, onDelete }) {
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "#fff",
     outline: "none",
@@ -306,7 +306,7 @@ function EditFocusModal({ goal, teams, onClose, onSaved, onDelete }) {
                 fontSize: "12px",
                 color: "#991B1B",
                 cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               🗑 Delete focus
@@ -322,7 +322,7 @@ function EditFocusModal({ goal, teams, onClose, onSaved, onDelete }) {
                   fontSize: "12px",
                   color: "var(--slate)",
                   cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "Inter, sans-serif",
                 }}
               >
                 Cancel
@@ -340,7 +340,7 @@ function EditFocusModal({ goal, teams, onClose, onSaved, onDelete }) {
                   color: "#fff",
                   cursor: saving ? "not-allowed" : "pointer",
                   opacity: saving ? 0.7 : 1,
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "Inter, sans-serif",
                 }}
               >
                 {saving ? "Saving…" : "Save"}
@@ -410,7 +410,7 @@ function EditFocusModal({ goal, teams, onClose, onSaved, onDelete }) {
                   fontSize: "12px",
                   color: "var(--slate)",
                   cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "Inter, sans-serif",
                 }}
               >
                 Cancel
@@ -426,7 +426,7 @@ function EditFocusModal({ goal, teams, onClose, onSaved, onDelete }) {
                   fontWeight: "600",
                   color: "#fff",
                   cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "Inter, sans-serif",
                 }}
               >
                 Delete
@@ -652,7 +652,7 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, teams, onClose, onSaved }) {
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "var(--white)",
     outline: "none",
@@ -754,7 +754,7 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, teams, onClose, onSaved }) {
                           ? "var(--blue-light)"
                           : "var(--bg)",
                       cursor: "pointer",
-                      fontFamily: "DM Sans, sans-serif",
+                      fontFamily: "Inter, sans-serif",
                     }}
                   >
                     <div
@@ -984,7 +984,7 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, teams, onClose, onSaved }) {
                 fontWeight: "500",
                 color: "var(--slate)",
                 cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               Cancel
@@ -1002,7 +1002,7 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, teams, onClose, onSaved }) {
                 color: "var(--white)",
                 cursor: saving ? "not-allowed" : "pointer",
                 opacity: saving ? 0.7 : 1,
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               {saving ? "Saving..." : "Save Product Focus"}
@@ -1071,7 +1071,7 @@ function AddPillarModal({ onClose, onSaved }) {
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "var(--white)",
     outline: "none",
@@ -1294,7 +1294,7 @@ function AddPillarModal({ onClose, onSaved }) {
                 fontSize: "12px",
                 color: "var(--slate)",
                 cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
                 width: "100%",
               }}
             >
@@ -1335,7 +1335,7 @@ function AddPillarModal({ onClose, onSaved }) {
                 fontWeight: "500",
                 color: "var(--slate)",
                 cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               Cancel
@@ -1353,7 +1353,7 @@ function AddPillarModal({ onClose, onSaved }) {
                 color: "var(--white)",
                 cursor: saving ? "not-allowed" : "pointer",
                 opacity: saving ? 0.7 : 1,
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               {saving ? "Saving..." : "Create pillar"}
@@ -1426,7 +1426,7 @@ function EditPillarModal({ pillar, onClose, onSaved }) {
     border: "1px solid var(--border)",
     borderRadius: "6px",
     fontSize: "12px",
-    fontFamily: "DM Sans, sans-serif",
+    fontFamily: "Inter, sans-serif",
     color: "var(--navy)",
     background: "#fff",
     outline: "none",
@@ -1671,7 +1671,7 @@ function EditPillarModal({ pillar, onClose, onSaved }) {
                 fontSize: "12px",
                 color: "var(--slate)",
                 cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
                 width: "100%",
               }}
             >
@@ -1712,7 +1712,7 @@ function EditPillarModal({ pillar, onClose, onSaved }) {
                 fontWeight: "500",
                 color: "var(--slate)",
                 cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               Cancel
@@ -1730,7 +1730,7 @@ function EditPillarModal({ pillar, onClose, onSaved }) {
                 color: "#fff",
                 cursor: saving ? "not-allowed" : "pointer",
                 opacity: saving ? 0.7 : 1,
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "Inter, sans-serif",
               }}
             >
               {saving ? "Saving…" : "Save changes"}
@@ -1874,7 +1874,7 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
               fontSize: "12px",
               color: "var(--slate)",
               cursor: "pointer",
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
               marginRight: "4px",
               flexShrink: 0,
             }}
@@ -1962,7 +1962,7 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
               background: "transparent",
               cursor: "pointer",
               padding: 0,
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
               flexShrink: 0,
             }}
           >
@@ -2290,7 +2290,7 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
                                 fontWeight: "600",
                                 color: "var(--blue)",
                                 cursor: "pointer",
-                                fontFamily: "DM Sans, sans-serif",
+                                fontFamily: "Inter, sans-serif",
                               }}
                             >
                               + Add strategic focus
@@ -2417,7 +2417,7 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
                   fontWeight: "500",
                   color: "var(--slate)",
                   cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "Inter, sans-serif",
                 }}
               >
                 Cancel
@@ -2433,7 +2433,7 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
                   fontWeight: "600",
                   color: "#fff",
                   cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "Inter, sans-serif",
                 }}
               >
                 Delete pillar
@@ -2524,7 +2524,7 @@ export default function Pillars() {
               fontWeight: "600",
               color: "#fff",
               cursor: "pointer",
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
             }}
           >
             + New pillar
@@ -2578,7 +2578,7 @@ export default function Pillars() {
               fontWeight: "600",
               color: "var(--white)",
               cursor: "pointer",
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
             }}
           >
             Create first pillar
