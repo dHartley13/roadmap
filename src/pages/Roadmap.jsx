@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { logEvent } from "../lib/audit";
-import ItemDetailPanel from '../pages/ItemDetailPanel'
+import ItemDetailPanel from "../pages/ItemDetailPanel";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const MONTHS = [
@@ -149,7 +149,14 @@ function defaultWeeks(quarter) {
 }
 
 // ── Timeline Item ───────────────────────────────────────────────────────────
-function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
+function TimelineItem({
+  item,
+  rowY,
+  lane = 0,
+  onUpdate,
+  onClick,
+  faded = false,
+}) {
   const dragRef = useRef(null);
   const tm = typeMeta(item.type);
   const teamColour = item.team_colour || null;
@@ -237,7 +244,7 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
   const itemH = TEAM_H - 10;
 
   return (
-    <g>
+    <g opacity={faded ? 0.25 : 1}>
       {/* Main box */}
       <rect
         x={x + 2}
@@ -252,7 +259,7 @@ function TimelineItem({ item, rowY, lane = 0, onUpdate, onClick }) {
         onClick={() => {
           if (!didDragRef.current) onClick(item);
         }}
-        style={{ cursor: "grab" }}
+        style={{ cursor: faded ? "default" : "grab" }}
       />
 
       {/* Top metadata row — type badge + team name + dep count + SMT star */}
@@ -1401,8 +1408,6 @@ function OutcomeCell({
   );
 }
 
-
-
 // ── Add Item Modal ──────────────────────────────────────────────────────────
 function AddItemModal({
   pillars,
@@ -1776,7 +1781,7 @@ export default function Roadmap() {
   const [selected, setSelected] = useState(null);
   const [filterYear, setFilterYear] = useState(CURRENT_YEAR);
   const [filterTeam, setFilterTeam] = useState("");
-  const [collapsedPillars, setCollapsedPillars] = useState({});
+  const [collapsedPillars, setCollapsedPillars] = useState(new Set());
   const [collapsedTeams, setCollapsedTeams] = useState({});
   const saveTimer = useRef({});
   const [mappingOutcome, setMappingOutcome] = useState(null);
@@ -1870,51 +1875,33 @@ export default function Roadmap() {
   // Build row structure
   const rows = [];
   const visiblePillars = filterPillar
-    ? (pillars || []).filter((p) => p.id === filterPillar)
-    : pillars || [];
+    ? pillars.filter((p) => p.id === filterPillar)
+    : pillars;
+
   visiblePillars.forEach((pillar) => {
     const pillarGoals = goals.filter((g) => g.pillar_id === pillar.id);
-    const isCollapsed = collapsedPillars[pillar.id];
+    const isCollapsed = collapsedPillars.has(pillar.id);
+
     rows.push({ type: "pillar", pillar, isCollapsed });
+
     if (!isCollapsed) {
-      pillarGoals.forEach((goal) => {
-        rows.push({ type: "kpi", pillar, goal });
-        // Team sub-rows
-        const visibleTeams = filterTeam
-          ? teams.filter((t) => t.id === filterTeam)
-          : teams;
-        visibleTeams.forEach((team) => {
-          const teamKey = `${goal.id}-${team.id}`;
-          const isTeamCollapsed = collapsedTeams[teamKey];
-          rows.push({
-            type: "team",
-            pillar,
-            goal,
-            team,
-            isCollapsed: isTeamCollapsed,
-          });
-        });
-        // Outcomes row
-        rows.push({ type: "outcome", pillar, goal });
-      });
       if (pillarGoals.length === 0) {
         rows.push({ type: "empty", pillar });
-
-        // Unassigned row — items linked to pillar but no goal/team
-        rows.push({ type: "unassigned", pillar });
+      } else {
+        pillarGoals.forEach((goal) => {
+          rows.push({ type: "focus", pillar, goal });
+          rows.push({ type: "outcome", pillar, goal });
+        });
       }
+      // Unassigned row — items with no goal
+      rows.push({ type: "unassigned", pillar });
     }
   });
 
   // Y positions
   const rowH = (r, laneCount = 1) => {
     if (r.type === "pillar") return PILLAR_H;
-    if (r.type === "kpi") return 28;
-    if (r.type === "team")
-      return r.isCollapsed
-        ? 20
-        : Math.max(TEAM_H, laneCount * (TEAM_H - 4) + 8);
-    if (r.type === "outcome") return OUTCOME_H;
+    if (r.type === 'focus') return Math.max(80, laneCount * (TEAM_H - 4) + 8)
     if (r.type === "empty") return TEAM_H;
     if (r.type === "unassigned") return TEAM_H;
     return TEAM_H;
@@ -1922,14 +1909,12 @@ export default function Roadmap() {
 
   // Pre-calculate lane counts per row
   const laneMaps = rows.map((row) => {
-    if (row.type === "team" && !row.isCollapsed && row.goal) {
+    if (row.type === "focus" && row.goal) {
       const rowItems = items.filter(
         (item) =>
-          (item.goal_id === row.goal.id &&
-            item.team_id === row.team.id &&
-            item.financial_year === filterYear &&
-            !filterSMT) ||
-          item.smt_priority,
+          item.goal_id === row.goal.id &&
+          item.financial_year === filterYear &&
+          (!filterSMT || item.smt_priority),
       );
       return assignLanes(rowItems);
     }
@@ -2159,7 +2144,7 @@ export default function Roadmap() {
                     textTransform: "uppercase",
                   }}
                 >
-                  Pillar / Product focus / Team
+                  Pillar / Product focus
                 </span>
               </div>
 
@@ -2180,10 +2165,13 @@ export default function Roadmap() {
                         gap: "8px",
                       }}
                       onClick={() =>
-                        setCollapsedPillars((p) => ({
-                          ...p,
-                          [row.pillar.id]: !p[row.pillar.id],
-                        }))
+                        setCollapsedPillars((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(row.pillar.id))
+                            next.delete(row.pillar.id);
+                          else next.add(row.pillar.id);
+                          return next;
+                        })
                       }
                     >
                       <div
@@ -2218,99 +2206,79 @@ export default function Roadmap() {
                       </span>
                     </div>
                   );
-                if (row.type === "kpi")
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        height: h,
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "0 12px 0 20px",
-                        borderBottom: "1px solid var(--border)",
-                        borderLeft: `3px solid ${row.pillar.colour}`,
-                        background: "var(--bg)",
-                        gap: "6px",
-                      }}
-                    >
-                      <div style={{ flex: 1, overflow: "hidden" }}>
-                        <div
-                          style={{
-                            fontSize: "10px",
-                            fontWeight: "700",
-                            color: "var(--navy)",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {row.goal.kpi_name}
-                        </div>
-                        {row.goal.driver_statement && (
-                          <div
-                            style={{
-                              fontSize: "9px",
-                              color: "var(--slate-light)",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              marginTop: "1px",
-                            }}
-                          >
-                            ↳ {row.goal.driver_statement}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                if (row.type === "team")
-                  return (
+
+                if (row.type === "focus")
+                  return ( 
                     <div
                       key={i}
                       style={{
                         height: rowH(row, laneMaps[i].laneCount),
                         display: "flex",
-                        alignItems: "center",
-                        padding: "0 10px 0 28px",
+                        alignItems: "flex-start",
+                        padding: "8px 12px 8px 24px",
                         borderBottom: "1px solid var(--border)",
-                        borderLeft: `3px solid ${row.team.colour}`,
-                        gap: "6px",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => {
-                        const k = `${row.goal.id}-${row.team.id}`;
-                        setCollapsedTeams((p) => ({ ...p, [k]: !p[k] }));
+                        borderLeft: `3px solid ${row.pillar.colour}`,
+                        background: "#fff",
+                        gap: "8px",
                       }}
                     >
-                      <div
-                        style={{
-                          width: "6px",
-                          height: "6px",
-                          borderRadius: "50%",
-                          background: row.team.colour,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontSize: "10px",
-                          fontWeight: "600",
-                          color: "var(--navy)",
-                          flex: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {row.team.name}
-                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {(() => {
+                          const leadTeam = teams.find(
+                            (t) => t.id === row.goal.team_id,
+                          );
+                          return leadTeam ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "3px",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "6px",
+                                  height: "6px",
+                                  borderRadius: "50%",
+                                  background: leadTeam.colour,
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: "9px",
+                                  fontWeight: "600",
+                                  color: "var(--slate-light)",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {leadTeam.name}
+                              </span>
+                            </div>
+                          ) : null;
+                        })()}
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: "600",
+                            color: "var(--slate)",
+                            letterSpacing: "0.04em",
+                            lineHeight: "1.4",
+                            whiteSpace: "normal",
+                          }}
+                        >
+                          {row.goal.driver_statement ||
+                            row.goal.kpi_name ||
+                            "No focus defined"}
+                        </div>
+                      </div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setAddCtx({
                             pillar_id: row.pillar.id,
                             goal_id: row.goal.id,
-                            team_id: row.team.id,
                           });
                           setShowAdd(true);
                         }}
@@ -2327,17 +2295,14 @@ export default function Roadmap() {
                           alignItems: "center",
                           justifyContent: "center",
                           flexShrink: 0,
+                          marginTop: "2px",
                         }}
                       >
                         +
                       </button>
-                      <span
-                        style={{ fontSize: "9px", color: "var(--slate-light)" }}
-                      >
-                        {row.isCollapsed ? "▸" : "▾"}
-                      </span>
                     </div>
                   );
+
                 if (row.type === "outcome")
                   return (
                     <div
@@ -2614,7 +2579,7 @@ export default function Roadmap() {
                           fill="#FFFBEB"
                         />
                       )}
-                      {row.type === "kpi" && (
+                      {row.type === "focus" && (
                         <rect
                           x={0}
                           y={y}
@@ -2661,27 +2626,29 @@ export default function Roadmap() {
 
                 {/* Roadmap items */}
                 {rows.map((row, i) => {
-                  if (row.type !== "team" || row.isCollapsed) return null;
+                  if (row.type !== "focus") return null;
                   const rowY = rowYs[i];
                   const { laneMap = {} } = laneMaps[i] || {};
                   const rowItems = items.filter(
                     (item) =>
-                      (item.goal_id === row.goal.id &&
-                        item.team_id === row.team.id &&
-                        item.financial_year === filterYear &&
-                        !filterSMT) ||
-                      item.smt_priority,
+                      item.goal_id === row.goal.id &&
+                      item.financial_year === filterYear &&
+                      (!filterSMT || item.smt_priority),
                   );
-                  return rowItems.map((item) => (
-                    <TimelineItem
-                      key={item.id}
-                      item={item}
-                      rowY={rowY}
-                      lane={laneMap[item.id] ?? 0}
-                      onUpdate={handleUpdate}
-                      onClick={setSelected}
-                    />
-                  ));
+                  return rowItems.map((item) => {
+                    const faded = filterTeam && item.team_id !== filterTeam;
+                    return (
+                      <TimelineItem
+                        key={item.id}
+                        item={item}
+                        rowY={rowY}
+                        lane={laneMap[item.id] ?? 0}
+                        onUpdate={handleUpdate}
+                        onClick={faded ? () => {} : setSelected}
+                        faded={faded}
+                      />
+                    );
+                  });
                 })}
 
                 {/* Unassigned items */}
