@@ -40,6 +40,7 @@ export default function ItemDetailPanel({
   pillars,
   goals,
   teams,
+  featureGroups = [],
   onClose,
   onSaved,
   onDeleted,
@@ -59,6 +60,9 @@ export default function ItemDetailPanel({
   const [allItems, setAllItems] = useState([]);
   const [form, setForm] = useState({ ...currentItem });
   const filteredGoals = goals.filter((g) => g.pillar_id === form.pillar_id);
+  const containerGroup = featureGroups.find(
+    (g) => g.id === currentItem.group_id,
+  );
 
   //dependencies --------------
   async function loadDeps() {
@@ -451,6 +455,7 @@ export default function ItemDetailPanel({
                   </div>
                 </div>
               )}
+
               {/* Hypothesis */}
               {form.hypothesis ? (
                 <div>
@@ -767,6 +772,70 @@ export default function ItemDetailPanel({
                   </div>
                 )}
               </div>
+
+              {currentItem.group_id && (
+                <div
+                  style={{
+                    borderTop: "1px solid var(--border)",
+                    paddingTop: "12px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: "700",
+                      color: "var(--blue)",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Container
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 12px",
+                      background: "var(--bg)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--navy)",
+                        fontWeight: "500",
+                      }}
+                    >
+                      {containerGroup?.title || "Unknown container"}
+                    </span>
+                    <button
+                      onClick={async () => {
+                        await supabase
+                          .from("roadmap_items")
+                          .update({ group_id: null })
+                          .eq("id", currentItem.id);
+                        onSaved();
+                      }}
+                      style={{
+                        fontSize: "11px",
+                        color: "#991B1B",
+                        background: "#FEE2E2",
+                        border: "none",
+                        borderRadius: "4px",
+                        padding: "3px 8px",
+                        cursor: "pointer",
+                        fontFamily: "Inter, sans-serif",
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Doc link */}
               {form.doc_url && (

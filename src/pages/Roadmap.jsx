@@ -91,36 +91,63 @@ function statusMeta(v) {
 }
 
 function assignLanes(rowItems) {
-  const sorted = [...rowItems].sort(
+  const grouped = rowItems.filter((i) => i.group_id);
+  const ungrouped = rowItems.filter((i) => !i.group_id);
+  const hasGroups = grouped.length > 0;
+
+  const laneMap = {};
+
+  // Assign lanes within grouped items (same logic as before, starting at lane 0)
+  const sortedGrouped = [...grouped].sort(
     (a, b) => (a.start_week ?? 0) - (b.start_week ?? 0),
   );
-  const lanes = []; // each lane is array of items
-
-  sorted.forEach((item) => {
+  const groupLanes = [];
+  sortedGrouped.forEach((item) => {
     const sw = item.start_week ?? 0;
     const ew = item.end_week ?? sw + 4;
-    // Find first lane where this item doesn't overlap
     let placed = false;
-    for (let i = 0; i < lanes.length; i++) {
-      const lastItem = lanes[i][lanes[i].length - 1];
-      const lastEW = lastItem.end_week ?? (lastItem.start_week ?? 0) + 4;
-      if (sw >= lastEW) {
-        lanes[i].push(item);
+    for (let i = 0; i < groupLanes.length; i++) {
+      const last = groupLanes[i][groupLanes[i].length - 1];
+      if (sw >= (last.end_week ?? 4)) {
+        groupLanes[i].push({ start_week: sw, end_week: ew });
+        laneMap[item.id] = i;
         placed = true;
         break;
       }
     }
-    if (!placed) lanes.push([item]);
+    if (!placed) {
+      groupLanes.push([{ start_week: sw, end_week: ew }]);
+      laneMap[item.id] = groupLanes.length - 1;
+    }
   });
 
-  // Return map of item id → lane index
-  const laneMap = {};
-  lanes.forEach((lane, li) => {
-    lane.forEach((item) => {
-      laneMap[item.id] = li;
-    });
+  // Ungrouped items start after all group lanes
+  const baseLane = hasGroups ? groupLanes.length : 0;
+  const sortedUngrouped = [...ungrouped].sort(
+    (a, b) => (a.start_week ?? 0) - (b.start_week ?? 0),
+  );
+  const ungroupedLanes = [];
+  sortedUngrouped.forEach((item) => {
+    const sw = item.start_week ?? 0;
+    const ew = item.end_week ?? sw + 4;
+    let placed = false;
+    for (let i = 0; i < ungroupedLanes.length; i++) {
+      const last = ungroupedLanes[i][ungroupedLanes[i].length - 1];
+      if (sw >= (last.end_week ?? 4)) {
+        ungroupedLanes[i].push({ start_week: sw, end_week: ew });
+        laneMap[item.id] = baseLane + i;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      ungroupedLanes.push([{ start_week: sw, end_week: ew }]);
+      laneMap[item.id] = baseLane + ungroupedLanes.length - 1;
+    }
   });
-  return { laneMap, laneCount: lanes.length };
+
+  const laneCount = groupLanes.length + ungroupedLanes.length || 1;
+  return { laneMap, laneCount, hasGroupedItems: hasGroups };
 }
 
 function quarterStartWeek(q) {
@@ -156,10 +183,14 @@ function TimelineItem({
   onUpdate,
   onClick,
   faded = false,
+  onGroup,
+  containerLanes = 0
 }) {
   const dragRef = useRef(null);
   const tm = typeMeta(item.type);
   const teamColour = item.team_colour || null;
+  const pillarColour = item.pillar_colour || null;
+  const groupOffset = item.group_id ? 18 : 0;
 
   const sw = item.start_week ?? quarterStartWeek(item.quarter || "Q1");
   const ew = item.end_week ?? sw + WEEKS_PER_MONTH;
@@ -167,7 +198,12 @@ function TimelineItem({
   const w = Math.max(WEEK_W, weekToX(ew) - x);
 
   const ITEM_H = TEAM_H - 10;
-  const laneOffsetY = lane * (ITEM_H + 4); // stack with 4px gap
+  const containerHeight = containerLanes > 0
+  ? containerLanes * (ITEM_H + 4) + 8 + 18
+  : 0
+const laneOffsetY = item.group_id
+  ? lane * (ITEM_H + 4)
+  : containerHeight + (lane - containerLanes) * (ITEM_H + 4)+ (containerLanes > 0 ? 4 : 0)
 
   const didDragRef = useRef(false);
 
@@ -248,12 +284,12 @@ function TimelineItem({
       {/* Main box */}
       <rect
         x={x + 2}
-        y={rowY + laneOffsetY + 5}
+        y={rowY + laneOffsetY + 5 + groupOffset}
         width={w - 4}
         height={itemH}
         rx={4}
-        fill={teamColour ? teamColour + "30" : tm.bg}
-        stroke={teamColour || tm.color}
+        fill="#ffffff"
+        stroke={pillarColour || tm.color}
         strokeWidth={1.5}
         onMouseDown={(e) => startDrag(e, "move")}
         onClick={() => {
@@ -265,7 +301,7 @@ function TimelineItem({
       {/* Top metadata row — type badge + team name + dep count + SMT star */}
       <foreignObject
         x={x + 6}
-        y={rowY + laneOffsetY + 6}
+        y={rowY + laneOffsetY + 6 + groupOffset}
         width={Math.max(0, w - 12)}
         height={16}
         style={{ pointerEvents: "none" }}
@@ -342,10 +378,46 @@ function TimelineItem({
         </div>
       </foreignObject>
 
+      {/* Container button */}
+      {!item.group_id && (
+        <foreignObject
+          x={x + w - 22}
+          y={rowY + laneOffsetY + 22 + groupOffset}
+          width={18}
+          height={14}
+        >
+          <div
+            xmlns="http://www.w3.org/1999/xhtml"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onGroup(item);
+            }}
+            style={{
+              fontSize: "8px",
+              fontWeight: "700",
+              padding: "1px 4px",
+              borderRadius: "2px",
+              background: "var(--border)",
+              color: "var(--slate)",
+              fontFamily: "Inter, sans-serif",
+              cursor: "pointer",
+              userSelect: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title="Add to container"
+          >
+            [ ]
+          </div>
+        </foreignObject>
+      )}
+
       {/* Feature name */}
       <foreignObject
         x={x + 6}
-        y={rowY + laneOffsetY + 22}
+        y={rowY + laneOffsetY + 18 + groupOffset}
         width={Math.max(0, w - 12)}
         height={itemH - 20}
         style={{ pointerEvents: "none" }}
@@ -355,7 +427,7 @@ function TimelineItem({
           style={{
             fontSize: "10px",
             fontWeight: "600",
-            color: teamColour || tm.color,
+            color: "#20292f",
             fontFamily: "Inter, sans-serif",
             lineHeight: "1.3",
             overflow: "hidden",
@@ -372,7 +444,7 @@ function TimelineItem({
       {/* Resize handles */}
       <rect
         x={x + 2}
-        y={rowY + laneOffsetY + 5}
+        y={rowY + laneOffsetY + 5 + groupOffset}
         width={8}
         height={itemH}
         rx={2}
@@ -382,7 +454,7 @@ function TimelineItem({
       />
       <rect
         x={x + w - 10}
-        y={rowY + laneOffsetY + 5}
+        y={rowY + laneOffsetY + 5 + groupOffset}
         width={8}
         height={itemH}
         rx={2}
@@ -1359,7 +1431,7 @@ function OutcomeCell({
               style={{
                 fontSize: "9px",
                 fontWeight: "500",
-                color: '#ffffff',
+                color: "#ffffff",
                 lineHeight: "1.3",
                 flex: 1,
                 cursor: "pointer",
@@ -1768,6 +1840,596 @@ function AddItemModal({
     </div>
   );
 }
+// ── Add to container modal ──────────────────────────────────────────────────────────
+function AddToContainerModal({
+  group,
+  pillarId,
+  goalId,
+  financialYear,
+  items,
+  pillars,
+  goals,
+  teams,
+  onClose,
+  onSaved,
+}) {
+  const [tab, setTab] = useState("search");
+  const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newType, setNewType] = useState("dev");
+  const [error, setError] = useState(null);
+
+  const availableItems = items.filter(
+    (item) =>
+      item.goal_id === goalId &&
+      item.financial_year === financialYear &&
+      !item.group_id &&
+      item.id !== undefined,
+  );
+
+  const searchResults = search.trim()
+    ? availableItems
+        .filter((item) =>
+          search
+            .toLowerCase()
+            .split(" ")
+            .every((w) => item.title.toLowerCase().includes(w)),
+        )
+        .slice(0, 8)
+    : availableItems.slice(0, 8);
+
+  async function addExisting(itemId) {
+    setSaving(true);
+    await supabase
+      .from("roadmap_items")
+      .update({ group_id: group.id })
+      .eq("id", itemId);
+    setSaving(false);
+    onSaved();
+  }
+
+  async function createNew() {
+    if (!newTitle.trim()) return setError("Title is required");
+    setSaving(true);
+    await supabase.from("roadmap_items").insert({
+      title: newTitle.trim(),
+      type: newType,
+      track: "delivery",
+      status: "to_do",
+      quarter: "Q1",
+      financial_year: financialYear,
+      pillar_id: pillarId || null,
+      goal_id: goalId || null,
+      group_id: group.id,
+      start_week: 0,
+      end_week: 4,
+      smt_priority: false,
+    });
+    setSaving(false);
+    onSaved();
+  }
+
+  const inp = {
+    width: "100%",
+    padding: "8px 10px",
+    border: "1px solid var(--border)",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontFamily: "Inter, sans-serif",
+    color: "var(--navy)",
+    background: "#fff",
+    outline: "none",
+  };
+  const lbl = {
+    fontSize: "10px",
+    fontWeight: "600",
+    color: "var(--slate)",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    marginBottom: "4px",
+    display: "block",
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 200,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "12px",
+          width: "480px",
+          maxHeight: "90vh",
+          overflow: "auto",
+          padding: "28px",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: "20px",
+          }}
+        >
+          <div>
+            <h2
+              className="font-display"
+              style={{
+                fontSize: "18px",
+                color: "var(--navy)",
+                marginBottom: "4px",
+              }}
+            >
+              Add to container
+            </h2>
+            <p style={{ fontSize: "12px", color: "var(--slate)" }}>
+              {group.title}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "6px",
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--slate-light)",
+              cursor: "pointer",
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div
+          style={{
+            display: "flex",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            overflow: "hidden",
+            marginBottom: "20px",
+          }}
+        >
+          <button
+            onClick={() => setTab("search")}
+            style={{
+              flex: 1,
+              padding: "8px",
+              border: "none",
+              background: tab === "search" ? "var(--navy)" : "#fff",
+              color: tab === "search" ? "#fff" : "var(--slate)",
+              fontSize: "12px",
+              fontWeight: "500",
+              cursor: "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+            Add existing
+          </button>
+          <button
+            onClick={() => setTab("create")}
+            style={{
+              flex: 1,
+              padding: "8px",
+              border: "none",
+              borderLeft: "1px solid var(--border)",
+              background: tab === "create" ? "var(--navy)" : "#fff",
+              color: tab === "create" ? "#fff" : "var(--slate)",
+              fontSize: "12px",
+              fontWeight: "500",
+              cursor: "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+            Create new
+          </button>
+        </div>
+
+        {tab === "search" && (
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+          >
+            <input
+              autoFocus
+              style={inp}
+              placeholder="Search features..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {searchResults.length === 0 ? (
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--slate-light)",
+                  fontStyle: "italic",
+                }}
+              >
+                No ungrouped features in this product focus.
+              </p>
+            ) : (
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "6px" }}
+              >
+                {searchResults.map((item) => {
+                  const team = teams.find((t) => t.id === item.team_id);
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => !saving && addExisting(item.id)}
+                      style={{
+                        padding: "10px 12px",
+                        border: "1px solid var(--border)",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = "var(--bg)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "#fff")
+                      }
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            color: "var(--navy)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {item.title}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            marginTop: "2px",
+                          }}
+                        >
+                          {team && (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "3px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "5px",
+                                  height: "5px",
+                                  borderRadius: "50%",
+                                  background: team.colour,
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: "10px",
+                                  color: "var(--slate-light)",
+                                }}
+                              >
+                                {team.name}
+                              </span>
+                            </div>
+                          )}
+                          {item.quarter && (
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                color: "var(--slate-light)",
+                              }}
+                            >
+                              {item.quarter}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--blue)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        Add →
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "create" && (
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "14px" }}
+          >
+            <div>
+              <label style={lbl}>Title *</label>
+              <input
+                autoFocus
+                style={inp}
+                placeholder="e.g. Build routing algorithm"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") createNew();
+                }}
+              />
+            </div>
+            <div>
+              <label style={lbl}>Type</label>
+              <select
+                style={{ ...inp, cursor: "pointer" }}
+                value={newType}
+                onChange={(e) => setNewType(e.target.value)}
+              >
+                {ITEM_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {error && (
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#991B1B",
+                  background: "#FEE2E2",
+                  padding: "8px 12px",
+                  borderRadius: "4px",
+                }}
+              >
+                {error}
+              </div>
+            )}
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={onClose}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "#fff",
+                  fontSize: "12px",
+                  color: "var(--slate)",
+                  cursor: "pointer",
+                  fontFamily: "Inter, sans-serif",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createNew}
+                disabled={saving}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "var(--blue)",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  color: "#fff",
+                  cursor: saving ? "not-allowed" : "pointer",
+                  opacity: saving ? 0.7 : 1,
+                  fontFamily: "Inter, sans-serif",
+                }}
+              >
+                {saving ? "Creating…" : "Create & add"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Create container modal ──────────────────────────────────────────────────────────
+function CreateContainerModal({ item, pillars, goals, onClose, onSaved }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [title, setTitle] = useState(item.title);
+
+  async function save() {
+    if (!title.trim()) return setError("Title is required");
+    setSaving(true);
+
+    const { data: group, error: groupError } = await supabase
+      .from("feature_groups")
+      .insert({
+        title: title.trim(),
+        goal_id: item.goal_id || null,
+        pillar_id: item.pillar_id || null,
+        financial_year: item.financial_year,
+      })
+      .select()
+      .single();
+
+    if (groupError) {
+      setError(groupError.message);
+      setSaving(false);
+      return;
+    }
+
+    await supabase
+      .from("roadmap_items")
+      .update({ group_id: group.id })
+      .eq("id", item.id);
+
+    setSaving(false);
+    onSaved();
+  }
+
+  const inp = {
+    width: "100%",
+    padding: "8px 10px",
+    border: "1px solid var(--border)",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontFamily: "Inter, sans-serif",
+    color: "var(--navy)",
+    background: "#fff",
+    outline: "none",
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 200,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "12px",
+          width: "440px",
+          padding: "28px",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
+        }}
+      >
+        <h2
+          className="font-display"
+          style={{
+            fontSize: "18px",
+            color: "var(--navy)",
+            marginBottom: "4px",
+          }}
+        >
+          Create container
+        </h2>
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--slate)",
+            marginBottom: "20px",
+            lineHeight: "1.5",
+          }}
+        >
+          Group related features under a shared container.{" "}
+          <strong>{item.title}</strong> will be the first item.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div>
+            <label
+              style={{
+                fontSize: "10px",
+                fontWeight: "600",
+                color: "var(--slate)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                marginBottom: "4px",
+                display: "block",
+              }}
+            >
+              Container name
+            </label>
+            <input
+              autoFocus
+              style={inp}
+              placeholder="e.g. Routing overhaul"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+              }}
+            />
+          </div>
+
+          {error && (
+            <div
+              style={{
+                fontSize: "12px",
+                color: "#991B1B",
+                background: "#FEE2E2",
+                padding: "8px 12px",
+                borderRadius: "4px",
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div
+            style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}
+          >
+            <button
+              onClick={onClose}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "6px",
+                border: "1px solid var(--border)",
+                background: "#fff",
+                fontSize: "12px",
+                color: "var(--slate)",
+                cursor: "pointer",
+                fontFamily: "Inter, sans-serif",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "6px",
+                border: "none",
+                background: "var(--blue)",
+                fontSize: "12px",
+                fontWeight: "600",
+                color: "#fff",
+                cursor: saving ? "not-allowed" : "pointer",
+                opacity: saving ? 0.7 : 1,
+                fontFamily: "Inter, sans-serif",
+              }}
+            >
+              {saving ? "Creating…" : "Create container"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Main ────────────────────────────────────────────────────────────────────
 export default function Roadmap() {
@@ -1790,24 +2452,31 @@ export default function Roadmap() {
   const [filterPillar, setFilterPillar] = useState("");
   const [filterSMT, setFilterSMT] = useState(false);
   const [dependencies, setDependencies] = useState([]);
+  const [featureGroups, setFeatureGroups] = useState([]);
+  const [containerItem, setContainerItem] = useState(null);
+  const [addToContainer, setAddToContainer] = useState(null);
 
   async function loadAll() {
-    const [ir, pr, gr, tr, or, dr] = await Promise.all([
+    const [ir, pr, gr, tr, or, dr, fgr] = await Promise.all([
       supabase.from("roadmap_items").select("*").order("created_at"),
       supabase.from("pillars").select("*").order("sort_order"),
       supabase.from("goals").select("*"),
       supabase.from("teams").select("*").order("sort_order"),
       supabase.from("quarterly_outcomes").select("*"),
       supabase.from("dependencies").select("from_item_id, to_item_id"),
+      supabase.from("feature_groups").select("*"),
     ]);
     const teamsData = tr.data || [];
     const depsData = dr.data || [];
+    const pillarsData = pr.data || [];
     setItems(
       (ir.data || []).map((item) => ({
         ...item,
         team_colour:
           teamsData.find((t) => t.id === item.team_id)?.colour || null,
         team_name: teamsData.find((t) => t.id === item.team_id)?.name || null,
+        pillar_colour:
+          pillarsData.find((p) => p.id === item.pillar_id)?.colour || null,
         dep_count: depsData.filter(
           (d) => d && (d.from_item_id === item.id || d.to_item_id === item.id),
         ).length,
@@ -1819,6 +2488,7 @@ export default function Roadmap() {
     setOutcomes(or.data || []);
     setLoading(false);
     setDependencies(dr.data || []);
+    setFeatureGroups(fgr.data || []);
   }
 
   useEffect(() => {
@@ -1900,43 +2570,55 @@ export default function Roadmap() {
   });
 
   // Y positions
-  const rowH = (r, laneCount = 1) => {
-    if (r.type === "pillar") return 36;
-    if (r.type === "focus") return Math.max(80, laneCount * (TEAM_H - 4) + 8);
-    if (r.type === "empty") return TEAM_H;
-    if (r.type === "outcome") return OUTCOME_H;
-    if (r.type === "unassigned") return TEAM_H;
-    return TEAM_H;
-  };
+const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => {
+  if (r.type === "pillar") return 36
+  if (r.type === "focus") {
+    const ITEM_H = TEAM_H - 10
+    if (!hasGroupedItems) {
+      return Math.max(80, laneCount * (ITEM_H + 4) + 8)
+    }
+    // Container height + ungrouped lanes below + gap
+    const containerH = groupLaneCount * (ITEM_H + 4) + 18 + 8
+    const ungroupedLanes = laneCount - groupLaneCount
+    const ungroupedH = ungroupedLanes > 0 ? ungroupedLanes * (ITEM_H + 4) + 4 : 0
+    return Math.max(80, containerH + ungroupedH + 8)
+  }
+  if (r.type === "outcome")    return OUTCOME_H
+  if (r.type === "empty")      return TEAM_H
+  if (r.type === "unassigned") return TEAM_H
+  return TEAM_H
+}
 
   // Pre-calculate lane counts per row
-  const laneMaps = rows.map((row) => {
-    if (row.type === "focus" && row.goal) {
-      const rowItems = items.filter(
-        (item) =>
-          item.goal_id === row.goal.id &&
-          item.financial_year === filterYear &&
-          (!filterSMT || item.smt_priority),
-      );
-      return assignLanes(rowItems);
-    }
-    if (row.type === "unassigned") {
-      const rowItems = items.filter(
-        (item) =>
-          item.pillar_id === row.pillar.id &&
-          !item.goal_id &&
-          item.financial_year === filterYear,
-      );
-      return assignLanes(rowItems);
-    }
-    return { laneMap: {}, laneCount: 1 };
-  });
+  const laneMaps = rows.map(row => {
+  if (row.type === 'focus' && row.goal) {
+    const rowItems = items.filter(item =>
+      item.goal_id === row.goal.id &&
+      item.financial_year === filterYear &&
+      (!filterSMT || item.smt_priority)
+    )
+    const { laneMap, laneCount, hasGroupedItems } = assignLanes(rowItems)
+    const groupLaneCount = hasGroupedItems
+      ? Math.max(0, ...rowItems.filter(i => i.group_id).map(i => (laneMap[i.id] ?? 0) + 1))
+      : 0
+    return { laneMap, laneCount, hasGroupedItems, groupLaneCount }
+  }
+  if (row.type === 'unassigned') {
+    const rowItems = items.filter(item =>
+      item.pillar_id === row.pillar.id &&
+      !item.goal_id &&
+      item.financial_year === filterYear
+    )
+    return { ...assignLanes(rowItems), groupLaneCount: 0 }
+  }
+  return { laneMap: {}, laneCount: 1, hasGroupedItems: false, groupLaneCount: 0 }
+})
 
   // Y positions using dynamic row heights
   let cy = HEADER_H;
   const rowYs = rows.map((r, i) => {
     const y = cy;
-    cy += rowH(r, laneMaps[i].laneCount);
+    cy += rowH(r, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0);
     return y;
   });
   const totalH = cy;
@@ -2151,7 +2833,7 @@ export default function Roadmap() {
               </div>
 
               {rows.map((row, i) => {
-                const h = rowH(row);
+                const h = rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
                 if (row.type === "pillar")
                   return (
                     <div
@@ -2206,7 +2888,7 @@ export default function Roadmap() {
                     <div
                       key={i}
                       style={{
-                        height: rowH(row, laneMaps[i].laneCount),
+                        height: rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0),
                         display: "flex",
                         alignItems: "flex-start",
                         padding: "8px 12px 8px 16px",
@@ -2307,7 +2989,7 @@ export default function Roadmap() {
                     <div
                       key={i}
                       style={{
-                        height: rowH(row, laneMaps[i]?.laneCount ?? 1),
+                        height: rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0),
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "center",
@@ -2550,7 +3232,7 @@ export default function Roadmap() {
                 {/* Row backgrounds + lines */}
                 {rows.map((row, i) => {
                   const y = rowYs[i];
-                  const h = rowH(row, laneMaps[i]?.laneCount ?? 1);
+                  const h = rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
                   return (
                     <g key={`rb${i}`}>
                       {row.type === "pillar" && (
@@ -2651,17 +3333,158 @@ export default function Roadmap() {
                   );
                 })}
 
+                {/* Feature group containers */}
+                {rows.map((row, i) => {
+                  if (row.type !== "focus") return null;
+                  const rowY = rowYs[i];
+                  const rowGroups = featureGroups.filter(
+                    (g) =>
+                      g.goal_id === row.goal.id &&
+                      g.financial_year === filterYear,
+                  );
+                  return rowGroups.map((group) => {
+                    const { laneMap = {} } = laneMaps[i] || {}
+                    const groupItems = items.filter(
+                      (item) =>
+                        item.group_id === group.id &&
+                        item.financial_year === filterYear,
+                    );
+                    if (groupItems.length === 0) return null;
+
+                    const startWeek = Math.min(
+                      ...groupItems.map((i) => i.start_week ?? 0),
+                    );
+                    const endWeek = Math.max(
+                      ...groupItems.map((i) => i.end_week ?? 4),
+                    );
+                    const x = weekToX(startWeek);
+                    const w = weekToX(endWeek) - x;
+
+                    //only count lanes used by group items
+                    const groupLaneCount = groupItems.length > 0
+                      ? Math.max(...groupItems.map(it => (laneMap[it.id] ?? 0) + 1))
+                      : 1
+                    const ITEM_H = TEAM_H - 10
+                    const h = Math.max(TEAM_H - 4, groupLaneCount * (ITEM_H + 4) + 8 + 18)
+
+                    const pillarColour = row.pillar.colour;
+
+                    return (
+                      <g key={group.id}>
+                        {/* Container background */}
+                        <rect
+                          x={x - 4}
+                          y={rowY + 4}
+                          width={w + 8}
+                          height={h}
+                          rx={6}
+                          fill={pillarColour + "18"}
+                          stroke={pillarColour}
+                          strokeWidth={1.5}
+                          strokeDasharray="4 2"
+                        />
+
+                        {/* Title bar background */}
+                        <rect
+                          x={x - 4}
+                          y={rowY + 4}
+                          width={w + 8}
+                          height={18}
+                          rx={6}
+                          fill={pillarColour}
+                        />
+
+                        {/* Cover bottom corners of title bar so it looks flat at bottom */}
+                        <rect
+                          x={x - 4}
+                          y={rowY + 16}
+                          width={w + 8}
+                          height={6}
+                          fill={pillarColour}
+                        />
+
+                        {/* Container title */}
+                        <foreignObject
+                          x={x - 2}
+                          y={rowY + 5}
+                          width={w + 4}
+                          height={16}
+                          style={{ pointerEvents: "none" }}
+                        >
+                          <div
+                            xmlns="http://www.w3.org/1999/xhtml"
+                            style={{
+                              fontSize: "9px",
+                              fontWeight: "700",
+                              color: "#ffffff",
+                              fontFamily: "Inter, sans-serif",
+                              letterSpacing: "0.04em",
+                              padding: "1px 6px",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {group.title}
+                          </div>
+                        </foreignObject>
+                        {/* Plus button */}
+                        <foreignObject
+                          x={x + w - 18}
+                          y={rowY + 5}
+                          width={16}
+                          height={16}
+                        >
+                          <div
+                            xmlns="http://www.w3.org/1999/xhtml"
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              setAddToContainer(group);
+                            }}
+                            style={{
+                              width: "14px",
+                              height: "14px",
+                              borderRadius: "3px",
+                              background: "rgba(255,255,255,0.3)",
+                              color: "#fff",
+                              fontSize: "12px",
+                              fontWeight: "700",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              userSelect: "none",
+                              fontFamily: "Inter, sans-serif",
+                            }}
+                          >
+                            +
+                          </div>
+                        </foreignObject>
+                      </g>
+                    );
+                  });
+                })}
+
                 {/* Roadmap items */}
                 {rows.map((row, i) => {
                   if (row.type !== "focus") return null;
                   const rowY = rowYs[i];
                   const { laneMap = {} } = laneMaps[i] || {};
+
+                  const groupLaneCount = laneMaps[i]?.hasGroupedItems
+                    ? Math.max(0, ...items
+                        .filter(it => it.group_id && it.goal_id === row.goal.id)
+                        .map(it => (laneMap[it.id] ?? 0) + 1))
+                    : 0
+
                   const rowItems = items.filter(
                     (item) =>
                       item.goal_id === row.goal.id &&
                       item.financial_year === filterYear &&
                       (!filterSMT || item.smt_priority),
                   );
+
                   return rowItems.map((item) => {
                     const faded = filterTeam && item.team_id !== filterTeam;
                     return (
@@ -2673,6 +3496,8 @@ export default function Roadmap() {
                         onUpdate={handleUpdate}
                         onClick={faded ? () => {} : setSelected}
                         faded={faded}
+                        onGroup={setContainerItem}
+                        containerLanes={groupLaneCount}
                       />
                     );
                   });
@@ -2705,7 +3530,7 @@ export default function Roadmap() {
                 {rows.map((row, i) => {
                   if (row.type !== "outcome") return null;
                   const y = rowYs[i];
-                  const h = rowH(row);
+                  const h = rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
                   return QUARTERS.map((q) => {
                     const sx = MONTHS.indexOf(QUARTER_MONTHS[q][0]) * MONTH_W;
                     const w = 3 * MONTH_W;
@@ -2773,6 +3598,37 @@ export default function Roadmap() {
         />
       )}
 
+      {addToContainer && (
+        <AddToContainerModal
+          group={addToContainer}
+          pillarId={addToContainer.pillar_id}
+          goalId={addToContainer.goal_id}
+          financialYear={filterYear}
+          items={items}
+          pillars={pillars}
+          goals={goals}
+          teams={teams}
+          onClose={() => setAddToContainer(null)}
+          onSaved={() => {
+            setAddToContainer(null);
+            loadAll();
+          }}
+        />
+      )}
+
+      {containerItem && (
+        <CreateContainerModal
+          item={containerItem}
+          pillars={pillars}
+          goals={goals}
+          onClose={() => setContainerItem(null)}
+          onSaved={() => {
+            setContainerItem(null);
+            loadAll();
+          }}
+        />
+      )}
+
       {mappingOutcome && (
         <OutcomeMappingModal
           outcome={mappingOutcome}
@@ -2806,6 +3662,7 @@ export default function Roadmap() {
           pillars={pillars}
           goals={goals}
           teams={teams}
+          featureGroups={featureGroups}
           onClose={() => setSelected(null)}
           onSaved={() => {
             setSelected(null);
