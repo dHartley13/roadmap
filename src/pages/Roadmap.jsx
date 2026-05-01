@@ -91,63 +91,68 @@ function statusMeta(v) {
 }
 
 function assignLanes(rowItems) {
-  const grouped = rowItems.filter((i) => i.group_id);
-  const ungrouped = rowItems.filter((i) => !i.group_id);
-  const hasGroups = grouped.length > 0;
-
-  const laneMap = {};
-
-  // Assign lanes within grouped items (same logic as before, starting at lane 0)
-  const sortedGrouped = [...grouped].sort(
+  const sorted = [...rowItems].sort(
     (a, b) => (a.start_week ?? 0) - (b.start_week ?? 0),
   );
-  const groupLanes = [];
-  sortedGrouped.forEach((item) => {
+  const lanes = [];
+  const laneMap = {};
+  sorted.forEach((item) => {
     const sw = item.start_week ?? 0;
     const ew = item.end_week ?? sw + 4;
     let placed = false;
-    for (let i = 0; i < groupLanes.length; i++) {
-      const last = groupLanes[i][groupLanes[i].length - 1];
+    for (let i = 0; i < lanes.length; i++) {
+      const last = lanes[i][lanes[i].length - 1];
       if (sw >= (last.end_week ?? 4)) {
-        groupLanes[i].push({ start_week: sw, end_week: ew });
+        lanes[i].push(item);
         laneMap[item.id] = i;
         placed = true;
         break;
       }
     }
     if (!placed) {
-      groupLanes.push([{ start_week: sw, end_week: ew }]);
-      laneMap[item.id] = groupLanes.length - 1;
+      lanes.push([item]);
+      laneMap[item.id] = lanes.length - 1;
     }
   });
+  return { laneMap, laneCount: lanes.length || 1 };
+}
 
-  // Ungrouped items start after all group lanes
-  const baseLane = hasGroups ? groupLanes.length : 0;
-  const sortedUngrouped = [...ungrouped].sort(
-    (a, b) => (a.start_week ?? 0) - (b.start_week ?? 0),
-  );
-  const ungroupedLanes = [];
-  sortedUngrouped.forEach((item) => {
-    const sw = item.start_week ?? 0;
-    const ew = item.end_week ?? sw + 4;
+function assignContainerLanes(groups, items) {
+  // Get time span for each container
+  const containerSpans = groups
+    .map((group) => {
+      const groupItems = items.filter((i) => i.group_id === group.id);
+      if (groupItems.length === 0) return null;
+      return {
+        id: group.id,
+        start: Math.min(...groupItems.map((i) => i.start_week ?? 0)),
+        end: Math.max(...groupItems.map((i) => i.end_week ?? 4)),
+      };
+    })
+    .filter(Boolean);
+
+  // Assign lanes to containers using the same overlap logic
+  const lanes = [];
+  const containerLaneMap = {};
+
+  containerSpans.forEach((span) => {
     let placed = false;
-    for (let i = 0; i < ungroupedLanes.length; i++) {
-      const last = ungroupedLanes[i][ungroupedLanes[i].length - 1];
-      if (sw >= (last.end_week ?? 4)) {
-        ungroupedLanes[i].push({ start_week: sw, end_week: ew });
-        laneMap[item.id] = baseLane + i;
+    for (let i = 0; i < lanes.length; i++) {
+      const last = lanes[i][lanes[i].length - 1];
+      if (span.start >= last.end) {
+        lanes[i].push(span);
+        containerLaneMap[span.id] = i;
         placed = true;
         break;
       }
     }
     if (!placed) {
-      ungroupedLanes.push([{ start_week: sw, end_week: ew }]);
-      laneMap[item.id] = baseLane + ungroupedLanes.length - 1;
+      lanes.push([span]);
+      containerLaneMap[span.id] = lanes.length - 1;
     }
   });
 
-  const laneCount = groupLanes.length + ungroupedLanes.length || 1;
-  return { laneMap, laneCount, hasGroupedItems: hasGroups };
+  return { containerLaneMap, containerLaneCount: lanes.length };
 }
 
 function quarterStartWeek(q) {
@@ -179,18 +184,20 @@ function defaultWeeks(quarter) {
 function TimelineItem({
   item,
   rowY,
-  lane = 0,
   onUpdate,
   onClick,
   faded = false,
   onGroup,
-  containerLanes = 0
+  containerLanes = 0,
+  internalLane = 0,
+  ungroupedLane = 0,
+  containerHeightsBefore = 0,
+  ungroupedOffset = 0,
 }) {
   const dragRef = useRef(null);
   const tm = typeMeta(item.type);
   const teamColour = item.team_colour || null;
   const pillarColour = item.pillar_colour || null;
-  const groupOffset = item.group_id ? 18 : 0;
 
   const sw = item.start_week ?? quarterStartWeek(item.quarter || "Q1");
   const ew = item.end_week ?? sw + WEEKS_PER_MONTH;
@@ -198,12 +205,11 @@ function TimelineItem({
   const w = Math.max(WEEK_W, weekToX(ew) - x);
 
   const ITEM_H = TEAM_H - 10;
-  const containerHeight = containerLanes > 0
-  ? containerLanes * (ITEM_H + 4) + 8 + 18
-  : 0
-const laneOffsetY = item.group_id
-  ? lane * (ITEM_H + 4)
-  : containerHeight + (lane - containerLanes) * (ITEM_H + 4)+ (containerLanes > 0 ? 4 : 0)
+  const containerHeight =
+    containerLanes > 0 ? containerLanes * (ITEM_H + 4) + 8 + 18 : 0;
+  const laneOffsetY = item.group_id
+    ? containerHeightsBefore + 18 + internalLane * (ITEM_H + 4)
+    : ungroupedOffset + ungroupedLane * (ITEM_H + 4);
 
   const didDragRef = useRef(false);
 
@@ -284,7 +290,7 @@ const laneOffsetY = item.group_id
       {/* Main box */}
       <rect
         x={x + 2}
-        y={rowY + laneOffsetY + 5 + groupOffset}
+        y={rowY + laneOffsetY + 5}
         width={w - 4}
         height={itemH}
         rx={4}
@@ -301,7 +307,7 @@ const laneOffsetY = item.group_id
       {/* Top metadata row — type badge + team name + dep count + SMT star */}
       <foreignObject
         x={x + 6}
-        y={rowY + laneOffsetY + 6 + groupOffset}
+        y={rowY + laneOffsetY + 6}
         width={Math.max(0, w - 12)}
         height={16}
         style={{ pointerEvents: "none" }}
@@ -382,7 +388,7 @@ const laneOffsetY = item.group_id
       {!item.group_id && (
         <foreignObject
           x={x + w - 22}
-          y={rowY + laneOffsetY + 22 + groupOffset}
+          y={rowY + laneOffsetY + 22}
           width={18}
           height={14}
         >
@@ -417,7 +423,7 @@ const laneOffsetY = item.group_id
       {/* Feature name */}
       <foreignObject
         x={x + 6}
-        y={rowY + laneOffsetY + 18 + groupOffset}
+        y={rowY + laneOffsetY + 18}
         width={Math.max(0, w - 12)}
         height={itemH - 20}
         style={{ pointerEvents: "none" }}
@@ -444,7 +450,7 @@ const laneOffsetY = item.group_id
       {/* Resize handles */}
       <rect
         x={x + 2}
-        y={rowY + laneOffsetY + 5 + groupOffset}
+        y={rowY + laneOffsetY + 5}
         width={8}
         height={itemH}
         rx={2}
@@ -454,7 +460,7 @@ const laneOffsetY = item.group_id
       />
       <rect
         x={x + w - 10}
-        y={rowY + laneOffsetY + 5 + groupOffset}
+        y={rowY + laneOffsetY + 5}
         width={8}
         height={itemH}
         rx={2}
@@ -2446,6 +2452,7 @@ export default function Roadmap() {
   const [filterTeam, setFilterTeam] = useState("");
   const [collapsedPillars, setCollapsedPillars] = useState(new Set());
   const [collapsedTeams, setCollapsedTeams] = useState({});
+  const [collapsedGoals, setCollapsedGoals] = useState(new Set());
   const saveTimer = useRef({});
   const [mappingOutcome, setMappingOutcome] = useState(null);
   const [addingOutcome, setAddingOutcome] = useState(null); // { pillarId, goalId, goal };
@@ -2560,8 +2567,16 @@ export default function Roadmap() {
         rows.push({ type: "empty", pillar });
       } else {
         pillarGoals.forEach((goal) => {
-          rows.push({ type: "focus", pillar, goal });
-          rows.push({ type: "outcome", pillar, goal });
+          const isGoalCollapsed = collapsedGoals.has(goal.id);
+          rows.push({
+            type: "focus",
+            pillar,
+            goal,
+            isCollapsed: isGoalCollapsed,
+          });
+          if (!isGoalCollapsed) {
+            rows.push({ type: "outcome", pillar, goal });
+          }
         });
       }
       // Unassigned row — items with no goal
@@ -2570,58 +2585,193 @@ export default function Roadmap() {
   });
 
   // Y positions
-const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => {
-  if (r.type === "pillar") return 36
-  if (r.type === "focus") {
-    const ITEM_H = TEAM_H - 10
-    if (!hasGroupedItems) {
-      return Math.max(80, laneCount * (ITEM_H + 4) + 8)
+  const rowH = (
+    r,
+    laneCount = 1,
+    hasGroupedItems = false,
+    groupLaneCount = 0,
+  ) => {
+    if (r.type === "pillar") return 36;
+    if (r.type === "focus") {
+      if (r.isCollapsed) return 36;
+      const ITEM_H = TEAM_H - 10;
+      // This needs containerLaneCount and containerInternalLaneCounts
+      // For now use a simpler calculation based on laneCount
+      if (!hasGroupedItems) return Math.max(80, laneCount * (ITEM_H + 4) + 8);
+      // With containers: sum container heights + ungrouped below
+      return Math.max(80, laneCount * (ITEM_H + 4) + 8 + 18 + 4);
     }
-    // Container height + ungrouped lanes below + gap
-    const containerH = groupLaneCount * (ITEM_H + 4) + 18 + 8
-    const ungroupedLanes = laneCount - groupLaneCount
-    const ungroupedH = ungroupedLanes > 0 ? ungroupedLanes * (ITEM_H + 4) + 4 : 0
-    return Math.max(80, containerH + ungroupedH + 8)
-  }
-  if (r.type === "outcome")    return OUTCOME_H
-  if (r.type === "empty")      return TEAM_H
-  if (r.type === "unassigned") return TEAM_H
-  return TEAM_H
-}
+    if (r.type === "outcome") return OUTCOME_H;
+    if (r.type === "empty") return TEAM_H;
+    if (r.type === "unassigned") return TEAM_H;
+    return TEAM_H;
+  };
 
   // Pre-calculate lane counts per row
-  const laneMaps = rows.map(row => {
-  if (row.type === 'focus' && row.goal) {
-    const rowItems = items.filter(item =>
-      item.goal_id === row.goal.id &&
-      item.financial_year === filterYear &&
-      (!filterSMT || item.smt_priority)
-    )
-    const { laneMap, laneCount, hasGroupedItems } = assignLanes(rowItems)
-    const groupLaneCount = hasGroupedItems
-      ? Math.max(0, ...rowItems.filter(i => i.group_id).map(i => (laneMap[i.id] ?? 0) + 1))
-      : 0
-    return { laneMap, laneCount, hasGroupedItems, groupLaneCount }
+  const laneMaps = rows.map((row) => {
+    if (row.type === "focus" && row.goal) {
+      const rowItems = items.filter(
+        (item) =>
+          item.goal_id === row.goal.id &&
+          item.financial_year === filterYear &&
+          (!filterSMT || item.smt_priority),
+      );
+      const rowGroups = featureGroups.filter(
+        (g) => g.goal_id === row.goal.id && g.financial_year === filterYear,
+      );
+
+      // Step 1 — assign container lanes (each container is a unit)
+      const { containerLaneMap, containerLaneCount } = assignContainerLanes(
+        rowGroups,
+        rowItems,
+      );
+
+      // Step 2 — assign internal lanes within each container
+      const itemContainerLane = {}; // item.id -> containerLane index
+      const itemInternalLane = {}; // item.id -> lane within container
+      const containerInternalLaneCounts = {}; // group.id -> how many internal lanes used
+
+      rowGroups.forEach((group) => {
+        const containerLane = containerLaneMap[group.id] ?? 0;
+        const groupItems = rowItems
+          .filter((i) => i.group_id === group.id)
+          .sort((a, b) => (a.start_week ?? 0) - (b.start_week ?? 0));
+
+        const internalLanes = [];
+        groupItems.forEach((item) => {
+          const sw = item.start_week ?? 0;
+          const ew = item.end_week ?? sw + 4;
+          let placed = false;
+          for (let i = 0; i < internalLanes.length; i++) {
+            const last = internalLanes[i][internalLanes[i].length - 1];
+            if (sw >= (last.end_week ?? 4)) {
+              internalLanes[i].push(item);
+              itemContainerLane[item.id] = containerLane;
+              itemInternalLane[item.id] = i;
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) {
+            internalLanes.push([item]);
+            itemContainerLane[item.id] = containerLane;
+            itemInternalLane[item.id] = internalLanes.length - 1;
+          }
+        });
+        containerInternalLaneCounts[group.id] = internalLanes.length || 1;
+      });
+
+      // Step 3 — assign lanes to ungrouped items (stack after containers)
+      const ungrouped = rowItems
+        .filter((i) => !i.group_id)
+        .sort((a, b) => (a.start_week ?? 0) - (b.start_week ?? 0));
+
+      const ungroupedLaneMap = {};
+      const ungroupedLanes = [];
+      ungrouped.forEach((item) => {
+        const sw = item.start_week ?? 0;
+        const ew = item.end_week ?? sw + 4;
+        let placed = false;
+        for (let i = 0; i < ungroupedLanes.length; i++) {
+          const last = ungroupedLanes[i][ungroupedLanes[i].length - 1];
+          if (sw >= (last.end_week ?? 4)) {
+            ungroupedLanes[i].push(item);
+            ungroupedLaneMap[item.id] = i;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          ungroupedLanes.push([item]);
+          ungroupedLaneMap[item.id] = ungroupedLanes.length - 1;
+        }
+      });
+
+      return {
+        itemContainerLane,
+        itemInternalLane,
+        ungroupedLaneMap,
+        ungroupedLaneCount: ungroupedLanes.length,
+        containerLaneMap,
+        containerLaneCount,
+        containerInternalLaneCounts,
+        hasGroupedItems: rowGroups.length > 0,
+        // Keep laneMap for compatibility
+        laneMap: {},
+        laneCount: 1,
+        groupLaneCount: 0,
+      };
+    }
+    if (row.type === "unassigned") {
+      const rowItems = items.filter(
+        (item) =>
+          item.pillar_id === row.pillar.id &&
+          !item.goal_id &&
+          item.financial_year === filterYear,
+      );
+      const { laneMap, laneCount } = assignLanes(rowItems);
+      return {
+        laneMap,
+        laneCount,
+        hasGroupedItems: false,
+        groupLaneCount: 0,
+        containerLaneMap: {},
+        containerLaneCount: 0,
+        itemContainerLane: {},
+        itemInternalLane: {},
+        ungroupedLaneMap: laneMap,
+        ungroupedLaneCount: laneCount,
+        containerInternalLaneCounts: {},
+      };
+    }
+    return {
+      laneMap: {},
+      laneCount: 1,
+      hasGroupedItems: false,
+      groupLaneCount: 0,
+      containerLaneMap: {},
+      containerLaneCount: 0,
+      itemContainerLane: {},
+      itemInternalLane: {},
+      ungroupedLaneMap: {},
+      ungroupedLaneCount: 0,
+      containerInternalLaneCounts: {},
+    };
+  });
+
+  function getFocusRowHeight(laneMapData, rowGroups) {
+  const ITEM_H = TEAM_H - 10
+  const { hasGroupedItems, containerLaneCount = 0, containerInternalLaneCounts = {}, ungroupedLaneCount = 0, containerLaneMap = {} } = laneMapData
+
+  if (!hasGroupedItems) {
+    return Math.max(80, (laneMapData.laneCount || 1) * (ITEM_H + 4) + 8)
   }
-  if (row.type === 'unassigned') {
-    const rowItems = items.filter(item =>
-      item.pillar_id === row.pillar.id &&
-      !item.goal_id &&
-      item.financial_year === filterYear
-    )
-    return { ...assignLanes(rowItems), groupLaneCount: 0 }
+
+  // Calculate height of each container lane
+  let totalContainerH = 0
+  for (let lane = 0; lane < containerLaneCount; lane++) {
+    const groupsInLane = rowGroups.filter(g => (containerLaneMap[g.id] ?? 0) === lane)
+    const maxInternal = Math.max(1, ...groupsInLane.map(g => containerInternalLaneCounts[g.id] ?? 1))
+    totalContainerH += maxInternal * (ITEM_H + 4) + 18 + 8
   }
-  return { laneMap: {}, laneCount: 1, hasGroupedItems: false, groupLaneCount: 0 }
-})
+
+  const ungroupedH = ungroupedLaneCount > 0 ? ungroupedLaneCount * (ITEM_H + 4) + 4 : 0
+  return Math.max(80, totalContainerH + ungroupedH + 8)
+}
 
   // Y positions using dynamic row heights
   let cy = HEADER_H;
   const rowYs = rows.map((r, i) => {
     const y = cy;
-    cy += rowH(r, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0);
-    return y;
-  });
-  const totalH = cy;
+    if (r.type === 'focus') {
+      const rowGroups = featureGroups.filter(g => g.goal_id === r.goal?.id && g.financial_year === filterYear)
+      cy += r.isCollapsed ? 36 : getFocusRowHeight(laneMaps[i], rowGroups)
+    } else {
+      cy += rowH(r, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
+    }
+    return y
+  })
+  const totalH = cy
 
   const sel = {
     padding: "6px 10px",
@@ -2833,7 +2983,12 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
               </div>
 
               {rows.map((row, i) => {
-                const h = rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
+                const h = rowH(
+                  row,
+                  laneMaps[i]?.laneCount ?? 1,
+                  laneMaps[i]?.hasGroupedItems ?? false,
+                  laneMaps[i]?.groupLaneCount ?? 0,
+                );
                 if (row.type === "pillar")
                   return (
                     <div
@@ -2888,7 +3043,10 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
                     <div
                       key={i}
                       style={{
-                        height: rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0),
+                        height: row.isCollapsed ? 36 : getFocusRowHeight(
+                          laneMaps[i], 
+                          featureGroups.filter(g => g.goal_id === row.goal?.id && g.financial_year === filterYear)
+                        ),
                         display: "flex",
                         alignItems: "flex-start",
                         padding: "8px 12px 8px 16px",
@@ -2981,15 +3139,47 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
                       >
                         +
                       </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCollapsedGoals((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(row.goal.id)) next.delete(row.goal.id);
+                            else next.add(row.goal.id);
+                            return next;
+                          });
+                        }}
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          borderRadius: "3px",
+                          border: "none",
+                          background: "transparent",
+                          color: "var(--slate-light)",
+                          cursor: "pointer",
+                          fontSize: "10px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          padding: 0,
+                        }}
+                      >
+                        {row.isCollapsed ? "▸" : "▾"}
+                      </button>
                     </div>
                   );
-
                 if (row.type === "outcome")
                   return (
                     <div
                       key={i}
                       style={{
-                        height: rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0),
+                        height: rowH(
+                          row,
+                          laneMaps[i]?.laneCount ?? 1,
+                          laneMaps[i]?.hasGroupedItems ?? false,
+                          laneMaps[i]?.groupLaneCount ?? 0,
+                        ),
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "center",
@@ -3003,7 +3193,7 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
                         style={{
                           fontSize: "8px",
                           fontWeight: "700",
-                          color: "#166534",
+                          color: "#20292f",
                           letterSpacing: "0.08em",
                           textTransform: "uppercase",
                           fontFamily: "Inter, sans-serif",
@@ -3015,7 +3205,7 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
                         <span
                           style={{
                             fontSize: "9px",
-                            color: "#166534",
+                            color: "#20292f",
                             marginTop: "2px",
                             opacity: 0.7,
                             fontFamily: "Inter, sans-serif",
@@ -3232,7 +3422,9 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
                 {/* Row backgrounds + lines */}
                 {rows.map((row, i) => {
                   const y = rowYs[i];
-                  const h = rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
+                  const h = row.type === 'focus'
+                    ? (row.isCollapsed ? 36 : getFocusRowHeight(laneMaps[i], featureGroups.filter(g => g.goal_id === row.goal?.id && g.financial_year === filterYear)))
+                    : rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
                   return (
                     <g key={`rb${i}`}>
                       {row.type === "pillar" && (
@@ -3335,15 +3527,42 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
 
                 {/* Feature group containers */}
                 {rows.map((row, i) => {
-                  if (row.type !== "focus") return null;
+                  if (row.type !== "focus" || row.isCollapsed) return null;
                   const rowY = rowYs[i];
+                  const {
+                    containerLaneMap = {},
+                    containerLaneCount = 0,
+                    containerInternalLaneCounts = {},
+                  } = laneMaps[i] || {};
+
                   const rowGroups = featureGroups.filter(
                     (g) =>
                       g.goal_id === row.goal.id &&
                       g.financial_year === filterYear,
                   );
+                  const ITEM_H = TEAM_H - 10;
+
+                  function containerLaneHeight(lane) {
+                    const groupsInLane = rowGroups.filter(
+                      (g) => (containerLaneMap[g.id] ?? 0) === lane,
+                    );
+                    const maxInternalLanes = Math.max(
+                      1,
+                      ...groupsInLane.map(
+                        (g) => containerInternalLaneCounts[g.id] ?? 1,
+                      ),
+                    );
+                    return maxInternalLanes * (ITEM_H + 4) + 18 + 8;
+                  }
+
+                  function heightBeforeContainerLane(lane) {
+                    let total = 0;
+                    for (let i = 0; i < lane; i++)
+                      total += containerLaneHeight(i);
+                    return total;
+                  }
+
                   return rowGroups.map((group) => {
-                    const { laneMap = {} } = laneMaps[i] || {}
                     const groupItems = items.filter(
                       (item) =>
                         item.group_id === group.id &&
@@ -3360,21 +3579,18 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
                     const x = weekToX(startWeek);
                     const w = weekToX(endWeek) - x;
 
-                    //only count lanes used by group items
-                    const groupLaneCount = groupItems.length > 0
-                      ? Math.max(...groupItems.map(it => (laneMap[it.id] ?? 0) + 1))
-                      : 1
-                    const ITEM_H = TEAM_H - 10
-                    const h = Math.max(TEAM_H - 4, groupLaneCount * (ITEM_H + 4) + 8 + 18)
-
+                    const cLane = containerLaneMap[group.id] ?? 0;
+                    const yOffset = heightBeforeContainerLane(cLane);
+                    const internalLanes =
+                      containerInternalLaneCounts[group.id] ?? 1;
+                    const h = internalLanes * (ITEM_H + 4) + 18 + 8;
                     const pillarColour = row.pillar.colour;
 
                     return (
                       <g key={group.id}>
-                        {/* Container background */}
                         <rect
                           x={x - 4}
-                          y={rowY + 4}
+                          y={rowY + 4 + yOffset}
                           width={w + 8}
                           height={h}
                           rx={6}
@@ -3383,30 +3599,24 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
                           strokeWidth={1.5}
                           strokeDasharray="4 2"
                         />
-
-                        {/* Title bar background */}
                         <rect
                           x={x - 4}
-                          y={rowY + 4}
+                          y={rowY + 4 + yOffset}
                           width={w + 8}
                           height={18}
                           rx={6}
                           fill={pillarColour}
                         />
-
-                        {/* Cover bottom corners of title bar so it looks flat at bottom */}
                         <rect
                           x={x - 4}
-                          y={rowY + 16}
+                          y={rowY + 16 + yOffset}
                           width={w + 8}
                           height={6}
                           fill={pillarColour}
                         />
-
-                        {/* Container title */}
                         <foreignObject
                           x={x - 2}
-                          y={rowY + 5}
+                          y={rowY + 5 + yOffset}
                           width={w + 4}
                           height={16}
                           style={{ pointerEvents: "none" }}
@@ -3428,10 +3638,9 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
                             {group.title}
                           </div>
                         </foreignObject>
-                        {/* Plus button */}
                         <foreignObject
                           x={x + w - 18}
-                          y={rowY + 5}
+                          y={rowY + 5 + yOffset}
                           width={16}
                           height={16}
                         >
@@ -3468,15 +3677,56 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
 
                 {/* Roadmap items */}
                 {rows.map((row, i) => {
-                  if (row.type !== "focus") return null;
+                  if (row.type !== "focus" || row.isCollapsed) return null;
                   const rowY = rowYs[i];
-                  const { laneMap = {} } = laneMaps[i] || {};
+                  const {
+                    itemContainerLane = {},
+                    itemInternalLane = {},
+                    ungroupedLaneMap = {},
+                    containerLaneMap = {},
+                    containerLaneCount = 0,
+                    containerInternalLaneCounts = {},
+                    hasGroupedItems = false,
+                  } = laneMaps[i] || {};
 
-                  const groupLaneCount = laneMaps[i]?.hasGroupedItems
-                    ? Math.max(0, ...items
-                        .filter(it => it.group_id && it.goal_id === row.goal.id)
-                        .map(it => (laneMap[it.id] ?? 0) + 1))
-                    : 0
+                  const rowGroups = featureGroups.filter(
+                    (g) =>
+                      g.goal_id === row.goal.id &&
+                      g.financial_year === filterYear,
+                  );
+
+                  const ITEM_H = TEAM_H - 10;
+
+                  // Calculate cumulative height of each container lane
+                  function containerLaneHeight(lane) {
+                    const groupsInLane = rowGroups.filter(
+                      (g) => (containerLaneMap[g.id] ?? 0) === lane,
+                    );
+                    const maxInternalLanes = Math.max(
+                      1,
+                      ...groupsInLane.map(
+                        (g) => containerInternalLaneCounts[g.id] ?? 1,
+                      ),
+                    );
+                    return maxInternalLanes * (ITEM_H + 4) + 18 + 8;
+                  }
+
+                  function heightBeforeContainerLane(lane) {
+                    let total = 0;
+                    for (let i = 0; i < lane; i++)
+                      total += containerLaneHeight(i);
+                    return total;
+                  }
+
+                  // Total height of all containers
+                  const totalContainerHeight = Array.from(
+                    { length: containerLaneCount },
+                    (_, i) => containerLaneHeight(i),
+                  ).reduce((sum, h) => sum + h, 0);
+
+                  const ungroupedOffset = hasGroupedItems
+                    ? totalContainerHeight + 4
+                    : 0;
 
                   const rowItems = items.filter(
                     (item) =>
@@ -3487,17 +3737,25 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
 
                   return rowItems.map((item) => {
                     const faded = filterTeam && item.team_id !== filterTeam;
+                    const cLane = itemContainerLane[item.id] ?? 0;
+                    const containerHeightsBefore = item.group_id
+                      ? heightBeforeContainerLane(cLane)
+                      : 0;
+
                     return (
                       <TimelineItem
                         key={item.id}
                         item={item}
                         rowY={rowY}
-                        lane={laneMap[item.id] ?? 0}
                         onUpdate={handleUpdate}
                         onClick={faded ? () => {} : setSelected}
                         faded={faded}
                         onGroup={setContainerItem}
-                        containerLanes={groupLaneCount}
+                        containerLane={cLane}
+                        internalLane={itemInternalLane[item.id] ?? 0}
+                        ungroupedLane={ungroupedLaneMap[item.id] ?? 0}
+                        containerHeightsBefore={containerHeightsBefore}
+                        ungroupedOffset={ungroupedOffset}
                       />
                     );
                   });
@@ -3530,7 +3788,12 @@ const rowH = (r, laneCount = 1, hasGroupedItems = false, groupLaneCount = 0) => 
                 {rows.map((row, i) => {
                   if (row.type !== "outcome") return null;
                   const y = rowYs[i];
-                  const h = rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
+                  const h = rowH(
+                    row,
+                    laneMaps[i]?.laneCount ?? 1,
+                    laneMaps[i]?.hasGroupedItems ?? false,
+                    laneMaps[i]?.groupLaneCount ?? 0,
+                  );
                   return QUARTERS.map((q) => {
                     const sx = MONTHS.indexOf(QUARTER_MONTHS[q][0]) * MONTH_W;
                     const w = 3 * MONTH_W;
