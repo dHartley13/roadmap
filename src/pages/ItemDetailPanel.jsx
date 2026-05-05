@@ -40,6 +40,7 @@ export default function ItemDetailPanel({
   pillars,
   goals,
   teams,
+  outcomes,
   featureGroups = [],
   onClose,
   onSaved,
@@ -64,9 +65,13 @@ export default function ItemDetailPanel({
   const businessMetrics = (selectedPillar?.success_criteria || []).filter((m) =>
     m.metric?.trim(),
   );
+  const filteredDrivers = filteredGoals.filter(
+    (g) => g.kpi_name === form.business_metric && g.driver_statement,
+  );
   const containerGroup = featureGroups.find(
     (g) => g.id === currentItem.group_id,
   );
+
   const [tab, setTab] = useState("strategy");
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -511,15 +516,61 @@ export default function ItemDetailPanel({
                 </select>
               </div>
 
-              {/* Product Focus */}
+              {/* Key Driver */}
               <div>
-                <label style={lbl}>Product Focus</label>
-                <input
-                  style={inp}
-                  placeholder="e.g. Average handling time"
-                  defaultValue={form.lead_metric_name || ""}
-                  onBlur={(e) => saveField("lead_metric_name", e.target.value)}
-                />
+                <label style={lbl}>Key Driver</label>
+                {!form.business_metric ? (
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--slate-light)",
+                      fontStyle: "italic",
+                      padding: "8px 10px",
+                      background: "var(--bg)",
+                      borderRadius: "6px",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    Select a Business Metric first
+                  </div>
+                ) : filteredDrivers.length === 0 ? (
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--slate-light)",
+                      fontStyle: "italic",
+                      padding: "8px 10px",
+                      background: "var(--bg)",
+                      borderRadius: "6px",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    No key drivers for this metric yet —{" "}
+                    <a
+                      href="/pillars"
+                      style={{ color: "var(--blue)", textDecoration: "none" }}
+                    >
+                      add one on the Pillars page
+                    </a>
+                  </div>
+                ) : (
+                  <select
+                    style={{ ...inp, cursor: "pointer" }}
+                    value={form.goal_id || ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, goal_id: e.target.value }))
+                    }
+                    onBlur={(e) => saveField("goal_id", e.target.value)}
+                  >
+                    <option value="">— Select key driver —</option>
+                    {filteredDrivers.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.driver_statement}
+                        {g.lead_metric_name ? ` · ${g.lead_metric_name}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Hypothesis */}
@@ -532,57 +583,50 @@ export default function ItemDetailPanel({
                   onBlur={(e) => saveField("hypothesis", e.target.value)}
                 />
               </div>
-
-              {/* Outcome links */}
+              {/* Outcome */}
               <div>
-                <div
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: "700",
-                    color: "var(--blue)",
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Outcomes contributing to
-                </div>
-                {loadingLinks ? (
-                  <p style={{ fontSize: "12px", color: "var(--slate-light)" }}>
-                    Loading...
-                  </p>
-                ) : itemLinks.length === 0 ? (
+                <label style={lbl}>Outcome</label>
+                {!form.goal_id ? (
                   <div
                     style={{
-                      padding: "10px 14px",
-                      border: "1px dashed var(--border)",
+                      fontSize: "12px",
+                      color: "var(--slate-light)",
+                      fontStyle: "italic",
+                      padding: "8px 10px",
+                      background: "var(--bg)",
                       borderRadius: "6px",
+                      border: "1px solid var(--border)",
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--slate-light)",
-                        fontStyle: "italic",
-                      }}
-                    >
-                      Not linked to any outcomes yet — click an outcome on the
-                      roadmap to link this feature.
-                    </span>
+                    Select a Key Driver first
                   </div>
                 ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "6px",
-                    }}
+                  <select
+                    style={{ ...inp, cursor: "pointer" }}
+                    value={form.outcome_id || ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, outcome_id: e.target.value }))
+                    }
+                    onBlur={(e) => saveField("outcome_id", e.target.value)}
                   >
-                    {itemLinks.map((link) => (
+                    <option value="">— No outcome linked —</option>
+                    {outcomes
+                      .filter((o) => o.goal_id === form.goal_id)
+                      .map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.quarter}: {o.summary}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                {form.outcome_id &&
+                  (() => {
+                    const o = outcomes.find((o) => o.id === form.outcome_id);
+                    return o ? (
                       <div
-                        key={link.id}
                         style={{
-                          padding: "10px 14px",
+                          marginTop: "6px",
+                          padding: "8px 10px",
                           background: "#F0FDF4",
                           border: "1px solid #BBF7D0",
                           borderRadius: "6px",
@@ -596,8 +640,7 @@ export default function ItemDetailPanel({
                             marginBottom: "2px",
                           }}
                         >
-                          {link.quarterly_outcomes?.quarter} ·{" "}
-                          {link.quarterly_outcomes?.financial_year}
+                          {o.quarter} · {o.financial_year}
                         </div>
                         <div
                           style={{
@@ -606,24 +649,11 @@ export default function ItemDetailPanel({
                             lineHeight: "1.4",
                           }}
                         >
-                          {link.quarterly_outcomes?.summary}
+                          {o.summary}
                         </div>
-                        {link.contribution_note && (
-                          <div
-                            style={{
-                              fontSize: "11px",
-                              color: "#166534",
-                              marginTop: "4px",
-                              fontStyle: "italic",
-                            }}
-                          >
-                            "{link.contribution_note}"
-                          </div>
-                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    ) : null;
+                  })()}
               </div>
             </div>
           )}

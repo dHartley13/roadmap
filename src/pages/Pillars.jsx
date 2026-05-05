@@ -718,7 +718,7 @@ function AddKPIFocusModal({ pillarId, pillarKPIs, teams, onClose, onSaved }) {
           </h2>
           <p style={{ fontSize: "12px", color: "var(--slate)" }}>
             Your product focus describes how your team will contribute to the
-            business strategy. Select the business KPI you've been assigned or
+            business strategy. Select the business metric you've been assigned or
             believe you can most influence, then describe what you'll focus on
             and how you'll measure progress.
           </p>
@@ -2293,7 +2293,7 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
                                 fontFamily: "Inter, sans-serif",
                               }}
                             >
-                              + Add strategic focus
+                              + Add product focus
                             </button>
                           </div>
                         </div>
@@ -2312,7 +2312,7 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
                       marginBottom: "10px",
                     }}
                   >
-                    No strategic focus yet — select a KPI above to add one
+                    No product focus yet — select a KPI above to add one
                   </p>
                 </div>
               )}
@@ -2396,7 +2396,7 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
                 marginBottom: "24px",
               }}
             >
-              This will also delete all strategic focuses and roadmap items
+              This will also delete all product focuses and roadmap items
               within this pillar. This cannot be undone.
             </p>
             <div

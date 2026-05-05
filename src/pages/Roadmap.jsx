@@ -3102,6 +3102,18 @@ export default function Roadmap() {
                             fontFamily: "Inter, sans-serif",
                           }}
                         >
+                         Product Focus:
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: "400",
+                            color: "var(--navy)",
+                            letterSpacing: "0.01em",
+                            lineHeight: "1.4",
+                            fontFamily: "Inter, sans-serif",
+                          }}
+                        >
                           {row.goal.driver_statement ||
                             row.goal.kpi_name ||
                             "No focus defined"}
@@ -3195,7 +3207,7 @@ export default function Roadmap() {
                           fontFamily: "Inter, sans-serif",
                         }}
                       >
-                        FY Outcome
+                        Outcome
                       </span>
                       {row.goal?.lead_metric_name && (
                         <span
@@ -3936,6 +3948,7 @@ export default function Roadmap() {
           pillars={pillars}
           goals={goals}
           teams={teams}
+          outcomes={outcomes}
           featureGroups={featureGroups}
           onClose={() => setSelected(null)}
           onSaved={() => {
