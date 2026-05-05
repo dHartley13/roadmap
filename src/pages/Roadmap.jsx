@@ -2603,7 +2603,11 @@ export default function Roadmap() {
     }
     if (r.type === "outcome") return OUTCOME_H;
     if (r.type === "empty") return TEAM_H;
-    if (r.type === "unassigned") return TEAM_H;
+    if (r.type === "unassigned") {
+      const ITEM_H = TEAM_H - 10;
+      return Math.max(TEAM_H, laneCount * (ITEM_H + 4) + 8);
+    }
+
     return TEAM_H;
   };
 
@@ -2706,7 +2710,7 @@ export default function Roadmap() {
       const rowItems = items.filter(
         (item) =>
           item.pillar_id === row.pillar.id &&
-          !item.goal_id &&
+          (!item.goal_id || item.goal_id === "") &&
           item.financial_year === filterYear,
       );
       const { laneMap, laneCount } = assignLanes(rowItems);
@@ -2740,38 +2744,57 @@ export default function Roadmap() {
   });
 
   function getFocusRowHeight(laneMapData, rowGroups) {
-  const ITEM_H = TEAM_H - 10
-  const { hasGroupedItems, containerLaneCount = 0, containerInternalLaneCounts = {}, ungroupedLaneCount = 0, containerLaneMap = {} } = laneMapData
+    const ITEM_H = TEAM_H - 10;
+    const {
+      hasGroupedItems,
+      containerLaneCount = 0,
+      containerInternalLaneCounts = {},
+      ungroupedLaneCount = 0,
+      containerLaneMap = {},
+    } = laneMapData;
 
-  if (!hasGroupedItems) {
-    return Math.max(80, (laneMapData.laneCount || 1) * (ITEM_H + 4) + 8)
+    if (!hasGroupedItems) {
+      return Math.max(80, (laneMapData.laneCount || 1) * (ITEM_H + 4) + 8);
+    }
+
+    // Calculate height of each container lane
+    let totalContainerH = 0;
+    for (let lane = 0; lane < containerLaneCount; lane++) {
+      const groupsInLane = rowGroups.filter(
+        (g) => (containerLaneMap[g.id] ?? 0) === lane,
+      );
+      const maxInternal = Math.max(
+        1,
+        ...groupsInLane.map((g) => containerInternalLaneCounts[g.id] ?? 1),
+      );
+      totalContainerH += maxInternal * (ITEM_H + 4) + 18 + 8;
+    }
+
+    const ungroupedH =
+      ungroupedLaneCount > 0 ? ungroupedLaneCount * (ITEM_H + 4) + 4 : 0;
+    return Math.max(80, totalContainerH + ungroupedH + 8);
   }
-
-  // Calculate height of each container lane
-  let totalContainerH = 0
-  for (let lane = 0; lane < containerLaneCount; lane++) {
-    const groupsInLane = rowGroups.filter(g => (containerLaneMap[g.id] ?? 0) === lane)
-    const maxInternal = Math.max(1, ...groupsInLane.map(g => containerInternalLaneCounts[g.id] ?? 1))
-    totalContainerH += maxInternal * (ITEM_H + 4) + 18 + 8
-  }
-
-  const ungroupedH = ungroupedLaneCount > 0 ? ungroupedLaneCount * (ITEM_H + 4) + 4 : 0
-  return Math.max(80, totalContainerH + ungroupedH + 8)
-}
 
   // Y positions using dynamic row heights
   let cy = HEADER_H;
   const rowYs = rows.map((r, i) => {
     const y = cy;
-    if (r.type === 'focus') {
-      const rowGroups = featureGroups.filter(g => g.goal_id === r.goal?.id && g.financial_year === filterYear)
-      cy += r.isCollapsed ? 36 : getFocusRowHeight(laneMaps[i], rowGroups)
+    if (r.type === "focus") {
+      const rowGroups = featureGroups.filter(
+        (g) => g.goal_id === r.goal?.id && g.financial_year === filterYear,
+      );
+      cy += r.isCollapsed ? 36 : getFocusRowHeight(laneMaps[i], rowGroups);
     } else {
-      cy += rowH(r, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
+      cy += rowH(
+        r,
+        laneMaps[i]?.laneCount ?? 1,
+        laneMaps[i]?.hasGroupedItems ?? false,
+        laneMaps[i]?.groupLaneCount ?? 0,
+      );
     }
-    return y
-  })
-  const totalH = cy
+    return y;
+  });
+  const totalH = cy;
 
   const sel = {
     padding: "6px 10px",
@@ -3043,10 +3066,16 @@ export default function Roadmap() {
                     <div
                       key={i}
                       style={{
-                        height: row.isCollapsed ? 36 : getFocusRowHeight(
-                          laneMaps[i], 
-                          featureGroups.filter(g => g.goal_id === row.goal?.id && g.financial_year === filterYear)
-                        ),
+                        height: row.isCollapsed
+                          ? 36
+                          : getFocusRowHeight(
+                              laneMaps[i],
+                              featureGroups.filter(
+                                (g) =>
+                                  g.goal_id === row.goal?.id &&
+                                  g.financial_year === filterYear,
+                              ),
+                            ),
                         display: "flex",
                         alignItems: "flex-start",
                         padding: "8px 12px 8px 16px",
@@ -3422,9 +3451,24 @@ export default function Roadmap() {
                 {/* Row backgrounds + lines */}
                 {rows.map((row, i) => {
                   const y = rowYs[i];
-                  const h = row.type === 'focus'
-                    ? (row.isCollapsed ? 36 : getFocusRowHeight(laneMaps[i], featureGroups.filter(g => g.goal_id === row.goal?.id && g.financial_year === filterYear)))
-                    : rowH(row, laneMaps[i]?.laneCount ?? 1, laneMaps[i]?.hasGroupedItems ?? false, laneMaps[i]?.groupLaneCount ?? 0)
+                  const h =
+                    row.type === "focus"
+                      ? row.isCollapsed
+                        ? 36
+                        : getFocusRowHeight(
+                            laneMaps[i],
+                            featureGroups.filter(
+                              (g) =>
+                                g.goal_id === row.goal?.id &&
+                                g.financial_year === filterYear,
+                            ),
+                          )
+                      : rowH(
+                          row,
+                          laneMaps[i]?.laneCount ?? 1,
+                          laneMaps[i]?.hasGroupedItems ?? false,
+                          laneMaps[i]?.groupLaneCount ?? 0,
+                        );
                   return (
                     <g key={`rb${i}`}>
                       {row.type === "pillar" && (
@@ -3769,7 +3813,7 @@ export default function Roadmap() {
                   const rowItems = items.filter(
                     (item) =>
                       item.pillar_id === row.pillar.id &&
-                      !item.goal_id &&
+                      (!item.goal_id || item.goal_id === "") &&
                       item.financial_year === filterYear,
                   );
                   return rowItems.map((item) => (

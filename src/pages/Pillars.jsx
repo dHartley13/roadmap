@@ -1190,7 +1190,7 @@ function AddPillarModal({ onClose, onSaved }) {
               }}
             >
               <label style={{ ...labelStyle, marginBottom: 0 }}>
-                Success criteria
+                Business Metrics
               </label>
               <span style={{ fontSize: "11px", color: "var(--slate-light)" }}>
                 These become your lagging KPIs
@@ -1568,7 +1568,7 @@ function EditPillarModal({ pillar, onClose, onSaved }) {
               }}
             >
               <label style={{ ...labelStyle, marginBottom: 0 }}>
-                Success criteria
+                Business Metrics
               </label>
               <span style={{ fontSize: "11px", color: "var(--slate-light)" }}>
                 These are your lagging KPIs
