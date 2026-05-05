@@ -1396,7 +1396,7 @@ function OutcomeCell({
           alignSelf: "flex-start",
         }}
       >
-        + outcome
+        + quarterly outcome
       </button>
       {qOutcomes.map((o) => (
         <div
@@ -2818,92 +2818,32 @@ export default function Roadmap() {
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "12px",
-        }}
-      >
-        <div>
-          <h1
-            className="font-display"
-            style={{
-              fontSize: "22px",
-              color: "var(--navy)",
-              marginBottom: "3px",
-            }}
-          >
-            Unified Roadmap
-          </h1>
-          <p style={{ fontSize: "11px", color: "var(--slate)" }}>
-            Drag to move · resize edges to adjust duration · quarter inferred
-            from position
-          </p>
-        </div>
+      <div style={{ marginBottom: "12px" }}>
+        {/* Title row */}
         <div
           style={{
             display: "flex",
-            gap: "8px",
-            alignItems: "center",
-            flexWrap: "wrap",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: "12px",
           }}
         >
-          <select
-            style={sel}
-            value={filterYear}
-            onChange={(e) => setFilterYear(e.target.value)}
-          >
-            {FINANCIAL_YEARS.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-          <select
-            style={sel}
-            value={filterPillar}
-            onChange={(e) => setFilterPillar(e.target.value)}
-          >
-            <option value="">All pillars</option>
-            {(pillars || []).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <select
-            style={sel}
-            value={filterTeam}
-            onChange={(e) => setFilterTeam(e.target.value)}
-          >
-            <option value="">All teams</option>
-            {(teams || []).map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => setFilterSMT((f) => !f)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "6px",
-              fontSize: "12px",
-              border: filterSMT ? "none" : "1px solid var(--border)",
-              background: filterSMT ? "var(--navy)" : "#fff",
-              color: filterSMT ? "#fff" : "var(--slate)",
-              cursor: "pointer",
-              fontFamily: "Inter, sans-serif",
-              fontWeight: filterSMT ? "600" : "400",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            ★ SMT
-          </button>
+          <div>
+            <h1
+              className="font-display"
+              style={{
+                fontSize: "22px",
+                color: "var(--navy)",
+                marginBottom: "3px",
+              }}
+            >
+              Unified Roadmap
+            </h1>
+            <p style={{ fontSize: "11px", color: "var(--slate)" }}>
+              Add and resize items, clicking on a feature opens an item detail
+              panel for more options
+            </p>
+          </div>
           <button
             onClick={() => {
               setAddCtx({});
@@ -2924,6 +2864,55 @@ export default function Roadmap() {
             + Add item
           </button>
         </div>
+
+        {/* Filter row */}
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: "600",
+              color: "var(--slate)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Filter by
+          </span>
+          <select
+            style={{ ...sel, width: "120px", flexShrink: 0 }}
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+          >
+            {FINANCIAL_YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+          <select
+            style={{ ...sel, width: "160px", flexShrink: 0 }}
+            value={filterPillar}
+            onChange={(e) => setFilterPillar(e.target.value)}
+          >
+            <option value="">All pillars</option>
+            {(pillars || []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name.length > 22 ? p.name.slice(0, 22) + "…" : p.name}
+              </option>
+            ))}
+          </select>
+          <select
+            style={{ ...sel, width: "140px", flexShrink: 0 }}
+            value={filterTeam}
+            onChange={(e) => setFilterTeam(e.target.value)}
+          >
+            <option value="">All teams</option>
+            {(teams || []).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Legend */}
@@ -2934,27 +2923,7 @@ export default function Roadmap() {
           marginBottom: "10px",
           flexWrap: "wrap",
         }}
-      >
-        {ITEM_TYPES.map((t) => (
-          <div
-            key={t.value}
-            style={{ display: "flex", alignItems: "center", gap: "4px" }}
-          >
-            <div
-              style={{
-                width: "9px",
-                height: "9px",
-                borderRadius: "2px",
-                background: t.bg,
-                border: `1.5px solid ${t.color}`,
-              }}
-            />
-            <span style={{ fontSize: "10px", color: "var(--slate)" }}>
-              {t.label}
-            </span>
-          </div>
-        ))}
-      </div>
+      ></div>
 
       {loading ? (
         <p style={{ fontSize: "13px", color: "var(--slate-light)" }}>
@@ -3129,9 +3098,7 @@ export default function Roadmap() {
                             fontWeight: "600",
                             color: "var(--navy)",
                             letterSpacing: "0.01em",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
+                            lineHeight: "1.4",
                             fontFamily: "Inter, sans-serif",
                           }}
                         >
@@ -3228,7 +3195,7 @@ export default function Roadmap() {
                           fontFamily: "Inter, sans-serif",
                         }}
                       >
-                        Outcomes
+                        FY Outcome
                       </span>
                       {row.goal?.lead_metric_name && (
                         <span
