@@ -5,6 +5,7 @@ import Settings from './pages/Settings'
 import AuditLog from './pages/AuditLog'
 import Dependencies from './pages/Dependencies'
 import ItemDetailPanel from './pages/ItemDetailPanel'
+import SMTView from './pages/SMTView'
 
 function Sidebar() {
   return (
@@ -37,8 +38,7 @@ function Sidebar() {
         {[
           { to: '/', label: 'Pillars & Goals', icon: '◈' },
           { to: '/roadmap', label: 'Unified Roadmap', icon: '⊞' },
-          { to: '/replan', label: 'Replan', icon: '⟳', soon: true },
-          { to: '/smt', label: 'SMT View', icon: '↗', soon: true },
+          { to: '/SMTView', label: 'SMT View', icon: '↗'},
           { to: '/audit', label: 'Audit Log', icon: '◷' },
           { to: '/settings', label: 'Settings', icon: '⚙' },
           { to: '/dependencies', label: 'Dependencies', icon: '⟳' }
@@ -93,6 +93,7 @@ export default function App() {
             <Route path="/audit" element={<AuditLog />} />
             <Route path="/dependencies" element={<Dependencies />} />
             <Route path="/ItemDetailPanel" element={<ItemDetailPanel />} />
+            <Route path="/SMTView" element={<SMTView />} />
           </Routes>
         </main>
       </div>
