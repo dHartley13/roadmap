@@ -380,7 +380,7 @@ export default function AuditLog() {
               lineHeight: "1.6",
             }}
           >
-            A record of significant changes to your roadmap, outcomes and KPIs.
+            A record of significant changes to your roadmap, dependencies, quartley outcomes and business outcomes.
           </p>
         </div>
         <button

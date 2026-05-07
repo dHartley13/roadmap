@@ -2293,7 +2293,7 @@ function PillarRow({ pillar, goals, teams, items, onReload }) {
                                 fontFamily: "Inter, sans-serif",
                               }}
                             >
-                              + Add product focus
+                              + Add key driver
                             </button>
                           </div>
                         </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+
 const TEAM_COLOURS = [
   "#1E40AF",
   "#0F766E",
@@ -564,6 +565,14 @@ function UserRow({ profile, teams, onReload }) {
     role: profile.role || "",
     team_id: profile.team_id || "",
   });
+
+  useEffect(() => {
+    setForm({
+      full_name: profile.full_name || "",
+      role: profile.role || "",
+      team_id: profile.team_id || "",
+    });
+  }, [profile]);
   const team = teams.find((t) => t.id === profile.team_id);
 
   const inp = {
@@ -590,7 +599,7 @@ function UserRow({ profile, teams, onReload }) {
 
   async function saveProfile() {
     setSaving(true);
-    await supabase
+    const { error } = await supabase
       .from("profiles")
       .update({
         full_name: form.full_name.trim() || null,
@@ -598,6 +607,7 @@ function UserRow({ profile, teams, onReload }) {
         team_id: form.team_id || null,
       })
       .eq("id", profile.id);
+    console.log("save error:", error);
     setSaving(false);
     setEditing(false);
     onReload();
@@ -653,6 +663,11 @@ function UserRow({ profile, teams, onReload }) {
             {profile.full_name || "No name"}
           </div>
           <div style={{ display: "flex", gap: "8px", marginTop: "2px" }}>
+            {profile.email && (
+              <span style={{ fontSize: "11px", color: "var(--slate-light)" }}>
+                {profile.email}
+              </span>
+            )}
             {profile.role && (
               <span style={{ fontSize: "11px", color: "var(--slate)" }}>
                 {profile.role}
@@ -1104,12 +1119,13 @@ export default function Settings() {
 
   async function loadTeams() {
     const [{ data: teamsData }, { data: profilesData }] = await Promise.all([
-      supabase.from("teams").select("*").order("sort_order"),
-      supabase.from("profiles").select("*"),
-    ]);
-    setTeams(teamsData || []);
-    setProfiles(profilesData || []);
-    setLoading(false);
+      supabase.from('teams').select('*').order('sort_order'),
+      supabase.from('user_profiles').select('*'),
+    ])
+    console.log('profiles after reload:', JSON.stringify(profilesData))
+    setTeams(teamsData || [])
+    setProfiles(profilesData || [])
+    setLoading(false)
   }
 
   useEffect(() => {

@@ -2508,8 +2508,6 @@ export default function Roadmap() {
 useEffect(() => {
   const params = new URLSearchParams(window.location.search)
   const itemId = params.get('item')
-  console.log('itemId from URL:', itemId)
-  console.log('items loaded:', items.length)
   if (itemId && items.length > 0) {
     const found = items.find(i => i.id === itemId)
     if (found) setSelected(found)

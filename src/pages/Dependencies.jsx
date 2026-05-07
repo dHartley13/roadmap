@@ -138,12 +138,15 @@ export default function Dependencies() {
   const [teams, setTeams] = useState([]);
   const [pillars, setPillars] = useState([]);
   const [goals, setGoals] = useState([]);
-  const [outcomes, setOutcomes] = useState([])
+  const [outcomes, setOutcomes] = useState([]);
   const [deps, setDeps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
+  const [profile, setProfile] = useState(null);
 
   async function loadAll() {
     const [ir, tr, pr, gr, dr, or] = await Promise.all([
@@ -173,12 +176,12 @@ export default function Dependencies() {
     loadAll();
   }, []);
 
-  //Support dependencies go to option in audit log
+  //Support dependencies "go to" option in audit log
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const q = params.get('q')
-    if (q) setSearch(q)
-  }, [])
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    if (q) setSearch(q);
+  }, []);
 
   // Fuzzy search
   useEffect(() => {
