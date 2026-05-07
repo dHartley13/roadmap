@@ -312,6 +312,8 @@ export default function AuditLog() {
   const [filterPillar, setFilterPillar] = useState("");
   const [filterTeam, setFilterTeam] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   async function loadAll() {
     const [lr, pr, tr] = await Promise.all([
@@ -337,6 +339,13 @@ export default function AuditLog() {
     if (filterPillar && l.pillar_id !== filterPillar) return false;
     if (filterTeam && l.team_id !== filterTeam) return false;
     if (filterType && l.event_type !== filterType) return false;
+    if (filterDateFrom && new Date(l.created_at) < new Date(filterDateFrom))
+      return false;
+    if (
+      filterDateTo &&
+      new Date(l.created_at) > new Date(filterDateTo + "T23:59:59")
+    )
+      return false;
     return true;
   });
 
@@ -380,7 +389,8 @@ export default function AuditLog() {
               lineHeight: "1.6",
             }}
           >
-            A record of significant changes to your roadmap, dependencies, quartley outcomes and business outcomes.
+            A record of significant changes to your roadmap, dependencies,
+            quartley outcomes and business outcomes.
           </p>
         </div>
         <button
@@ -447,12 +457,30 @@ export default function AuditLog() {
             </option>
           ))}
         </select>
-        {(filterPillar || filterTeam || filterType) && (
+        <input
+          type="date"
+          style={sel}
+          value={filterDateFrom}
+          onChange={(e) => setFilterDateFrom(e.target.value)}
+        />
+        <input
+          type="date"
+          style={sel}
+          value={filterDateTo}
+          onChange={(e) => setFilterDateTo(e.target.value)}
+        />
+        {(filterPillar ||
+          filterTeam ||
+          filterType ||
+          filterDateFrom ||
+          filterDateTo) && (
           <button
             onClick={() => {
               setFilterPillar("");
               setFilterTeam("");
               setFilterType("");
+              setFilterDateFrom("");
+              setFilterDateTo("");
             }}
             style={{ ...sel, color: "var(--blue)", borderColor: "var(--blue)" }}
           >
