@@ -504,6 +504,8 @@ function OutcomeMappingModal({ outcome, items, onClose, onSaved }) {
     loadLinks();
   }, [outcome.id]);
 
+
+
   async function addLink(itemId) {
     await supabase.from("outcome_items").insert({
       outcome_id: outcome.id,
@@ -2501,6 +2503,18 @@ export default function Roadmap() {
   useEffect(() => {
     loadAll();
   }, []);
+
+    //Pass entity IDs for go to links in dependencies
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search)
+  const itemId = params.get('item')
+  console.log('itemId from URL:', itemId)
+  console.log('items loaded:', items.length)
+  if (itemId && items.length > 0) {
+    const found = items.find(i => i.id === itemId)
+    if (found) setSelected(found)
+  }
+}, [items])
 
   const handleUpdate = useCallback(
     (id, changes, persist) => {

@@ -138,6 +138,7 @@ export default function Dependencies() {
   const [teams, setTeams] = useState([]);
   const [pillars, setPillars] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [outcomes, setOutcomes] = useState([])
   const [deps, setDeps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -145,12 +146,13 @@ export default function Dependencies() {
   const [searchResults, setSearchResults] = useState([]);
 
   async function loadAll() {
-    const [ir, tr, pr, gr, dr] = await Promise.all([
+    const [ir, tr, pr, gr, dr, or] = await Promise.all([
       supabase.from("roadmap_items").select("*"),
       supabase.from("teams").select("*"),
       supabase.from("pillars").select("*"),
       supabase.from("goals").select("*"),
       supabase.from("dependencies").select("*"),
+      supabase.from("quarterly_outcomes").select("*"),
     ]);
     const teamsData = tr.data || [];
     const itemsData = (ir.data || []).map((item) => ({
@@ -163,12 +165,20 @@ export default function Dependencies() {
     setPillars(pr.data || []);
     setGoals(gr.data || []);
     setDeps(dr.data || []);
+    setOutcomes(or.data || []);
     setLoading(false);
   }
 
   useEffect(() => {
     loadAll();
   }, []);
+
+  //Support dependencies go to option in audit log
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q')
+    if (q) setSearch(q)
+  }, [])
 
   // Fuzzy search
   useEffect(() => {
@@ -511,6 +521,7 @@ export default function Dependencies() {
           item={selected}
           pillars={pillars}
           goals={goals}
+          outcomes={outcomes}
           teams={teams}
           onClose={() => setSelected(null)}
           onSaved={() => {

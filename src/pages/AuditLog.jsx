@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 const EVENT_META = {
-  item_moved: { label: "Feature moved", color: "#1E40AF", bg: "#DBEAFE" },
+  item_moved: { label: "Feature updated", color: "#1E40AF", bg: "#DBEAFE" },
   item_resized: { label: "Feature resized", color: "#92400E", bg: "#FEF3C7" },
   item_updated: { label: "Feature updated", color: "#0F766E", bg: "#CCFBF1" },
   item_created: { label: "Feature added", color: "#166534", bg: "#DCFCE7" },
@@ -13,9 +13,13 @@ const EVENT_META = {
     color: "#BE185D",
     bg: "#FCE7F3",
   },
-  kpi_updated: { label: "KPI updated", color: "#B45309", bg: "#FEF3C7" },
-  kpi_deleted: { label: "KPI deleted", color: "#991B1B", bg: "#FEE2E2" },
-  kpi_created: { label: "KPI created", color: "#166534", bg: "#DCFCE7" },
+  kpi_updated: {
+    label: "Business outcome updated",
+    color: "#B45309",
+    bg: "#FEF3C7",
+  },
+  kpi_deleted: { label: "Business outcome", color: "#991B1B", bg: "#FEE2E2" },
+  kpi_created: { label: "Business outcome", color: "#166534", bg: "#DCFCE7" },
   dependency_created: {
     label: "Dependency added",
     color: "#ffffff",
@@ -168,41 +172,41 @@ function ChangeSummary({ eventType, oldValue, newValue }) {
     );
   }
 
-      if (eventType === "dependency_created") {
-      return (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "var(--slate)",
-            marginTop: "4px",
-            lineHeight: "1.6",
-          }}
-        >
-          <div>
-            <strong>{newValue?.from}</strong> depends on{" "}
-            <strong>{newValue?.to}</strong>
-          </div>
+  if (eventType === "dependency_created") {
+    return (
+      <div
+        style={{
+          fontSize: "11px",
+          color: "var(--slate)",
+          marginTop: "4px",
+          lineHeight: "1.6",
+        }}
+      >
+        <div>
+          <strong>{newValue?.from}</strong> depends on{" "}
+          <strong>{newValue?.to}</strong>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-    if (eventType === "dependency_removed") {
-      return (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "var(--slate)",
-            marginTop: "4px",
-            lineHeight: "1.6",
-          }}
-        >
-          <div>
-            Removed: <strong>{oldValue?.from}</strong> →{" "}
-            <strong>{oldValue?.to}</strong>
-          </div>
+  if (eventType === "dependency_removed") {
+    return (
+      <div
+        style={{
+          fontSize: "11px",
+          color: "var(--slate)",
+          marginTop: "4px",
+          lineHeight: "1.6",
+        }}
+      >
+        <div>
+          Removed: <strong>{oldValue?.from}</strong> →{" "}
+          <strong>{oldValue?.to}</strong>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
   if (eventType === "item_updated") {
     const changes = [];
@@ -234,14 +238,16 @@ function ChangeSummary({ eventType, oldValue, newValue }) {
   if (eventType === "kpi_updated") {
     const changes = [];
     if (oldValue?.kpi_name !== newValue?.kpi_name)
-      changes.push(`KPI: ${oldValue?.kpi_name} → ${newValue?.kpi_name}`);
+      changes.push(
+        `Business outcome: ${oldValue?.kpi_name} → ${newValue?.kpi_name}`,
+      );
     if (oldValue?.kpi_target !== newValue?.kpi_target)
       changes.push(`Target: ${oldValue?.kpi_target} → ${newValue?.kpi_target}`);
     if (oldValue?.driver_statement !== newValue?.driver_statement)
-      changes.push(`Focus area updated`);
+      changes.push(`Key driver updated`);
     if (oldValue?.lead_metric_name !== newValue?.lead_metric_name)
       changes.push(
-        `Measure: ${oldValue?.lead_metric_name} → ${newValue?.lead_metric_name}`,
+        `Key driver metric: ${oldValue?.lead_metric_name} → ${newValue?.lead_metric_name}`,
       );
     if (changes.length === 0) return null;
     return (
@@ -269,9 +275,9 @@ function ChangeSummary({ eventType, oldValue, newValue }) {
           lineHeight: "1.6",
         }}
       >
-        {newValue?.kpi_name && <div>KPI: {newValue.kpi_name}</div>}
+        {newValue?.kpi_name && <div>Business outcome: {newValue.kpi_name}</div>}
         {newValue?.driver_statement && (
-          <div>Focus: {newValue.driver_statement}</div>
+          <div>Key driver: {newValue.driver_statement}</div>
         )}
         {newValue?.lead_metric_name && (
           <div>Measuring: {newValue.lead_metric_name}</div>
@@ -485,9 +491,8 @@ export default function AuditLog() {
               lineHeight: "1.6",
             }}
           >
-            Changes to features, outcomes and KPIs will appear here.
-            <br />
-            Start by moving a feature on the roadmap or updating a KPI.
+            Changes to features, quarterly outcomes and business outcomes will
+            appear here.
           </p>
         </div>
       ) : (
@@ -555,14 +560,102 @@ export default function AuditLog() {
                   </div>
                   <div
                     style={{
-                      fontSize: "10px",
-                      color: "var(--slate-light)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: "6px",
                       flexShrink: 0,
-                      textAlign: "right",
-                      marginTop: "2px",
                     }}
                   >
-                    {formatDate(log.created_at)}
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: "var(--slate-light)",
+                        textAlign: "right",
+                      }}
+                    >
+                      {formatDate(log.created_at)}
+                    </div>
+                    {[
+                      "item_moved",
+                      "item_updated",
+                      "item_created",
+                      "item_resized",
+                    ].includes(log.event_type) &&
+                      log.entity_id && (
+                        <a
+                          href={`/roadmap?item=${log.entity_id}`}
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--blue)",
+                            background: "transparent",
+                            border: "1px solid var(--blue)",
+                            borderRadius: "4px",
+                            padding: "3px 8px",
+                            cursor: "pointer",
+                            textDecoration: "none",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Go to feature →
+                        </a>
+                      )}
+                    {["outcome_added"].includes(log.event_type) && (
+                      <a
+                        href="/roadmap"
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--blue)",
+                          background: "transparent",
+                          border: "1px solid var(--blue)",
+                          borderRadius: "4px",
+                          padding: "3px 8px",
+                          cursor: "pointer",
+                          textDecoration: "none",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Go to outcome →
+                      </a>
+                    )}
+                    {["kpi_updated", "kpi_created"].includes(
+                      log.event_type,
+                    ) && (
+                      <a
+                        href="/"
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--blue)",
+                          background: "transparent",
+                          border: "1px solid var(--blue)",
+                          borderRadius: "4px",
+                          padding: "3px 8px",
+                          cursor: "pointer",
+                          textDecoration: "none",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Go to pillars →
+                      </a>
+                    )}
+                    {["dependency_created"].includes(log.event_type) && (
+                      <a
+                        href={`/dependencies?q=${encodeURIComponent(log.entity_name || "")}`}
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--blue)",
+                          background: "transparent",
+                          border: "1px solid var(--blue)",
+                          borderRadius: "4px",
+                          padding: "3px 8px",
+                          cursor: "pointer",
+                          textDecoration: "none",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Go to dependencies →
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
